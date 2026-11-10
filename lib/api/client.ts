@@ -36,7 +36,7 @@ class ApiClient {
 
   private constructor() {
     const baseURL =
-      process.env.NEXT_PUBLIC_API_URL ||
+      process.env.NEXT_API_URL ||
       "https://desktop-api-4f850b3f9733.herokuapp.com";
 
     this.client = axios.create({
