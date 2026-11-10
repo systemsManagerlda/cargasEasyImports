@@ -480,10 +480,7 @@ export const CargaTimeline: React.FC<CargaTimelineProps> = ({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setExpandedId(null);
-                                }}
+                                onClick={() => setExpandedId(null)}
                               >
                                 Fechar detalhes
                               </Button>

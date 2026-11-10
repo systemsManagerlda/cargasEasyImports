@@ -1,7 +1,7 @@
-// app/(auth)/login/page.tsx
+
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '../../../lib/hooks/useAuth'
 import { Button } from '../../../components/ui/Button'
@@ -11,9 +11,10 @@ import { Card, CardBody } from '../../../components/ui/Card'
 import { Package, Eye, EyeOff, Mail, Lock } from 'lucide-react'
 import Link from 'next/link'
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter()
   const { login, isAuthenticated, loading: authLoading } = useAuth()
+
   const [username, setUsername] = useState<string>('')
   const [password, setPassword] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
@@ -46,10 +47,15 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
 
-    const result = await login(username, password)
+    try {
+      const result = await login(username, password)
 
-    if (!result.success) {
-      setError(result.error || 'Credenciais inválidas')
+      if (!result.success) {
+        setError(result.error || 'Credenciais inválidas')
+      }
+    } catch {
+      setError('Ocorreu um erro ao tentar iniciar sessão.')
+    } finally {
       setLoading(false)
     }
   }
@@ -65,9 +71,11 @@ export default function LoginPage() {
                   <Package className="w-12 h-12 text-gray-600" />
                 </div>
               </div>
+
               <h2 className="text-2xl font-bold text-gray-800">
                 Sistema de Rastreio
               </h2>
+
               <p className="text-gray-500 text-sm mt-1">
                 Faça login para acessar o sistema
               </p>
@@ -84,7 +92,9 @@ export default function LoginPage() {
                 label="Usuário ou Email"
                 type="text"
                 value={username}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setUsername(e.target.value)
+                }
                 placeholder="Digite seu nome de usuário ou email"
                 required
                 autoComplete="username"
@@ -96,7 +106,9 @@ export default function LoginPage() {
                 label="Senha"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setPassword(e.target.value)
+                }
                 placeholder="Digite sua senha"
                 required
                 autoComplete="current-password"
@@ -108,7 +120,11 @@ export default function LoginPage() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
                   </button>
                 }
               />
@@ -119,6 +135,7 @@ export default function LoginPage() {
                 size="lg"
                 fullWidth
                 loading={loading}
+                disabled={loading}
                 className="bg-gray-800 hover:bg-gray-900 text-white focus:ring-gray-500"
               >
                 Entrar
@@ -131,6 +148,7 @@ export default function LoginPage() {
                 >
                   Criar nova conta
                 </Link>
+
                 <Link
                   href="/recuperar-senha"
                   className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
@@ -149,5 +167,24 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+function LoginFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-gray-400 border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="mt-4 text-gray-500">A carregar página de login...</p>
+      </div>
+    </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginFallback />}>
+      <LoginContent />
+    </Suspense>
   )
 }

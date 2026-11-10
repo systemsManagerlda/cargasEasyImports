@@ -1,11 +1,15 @@
-// app/(auth)/layout.tsx
+
 'use client'
 
-import React, { useEffect, useRef } from 'react'
-import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import React, { useEffect, useRef, Suspense } from 'react'
+import {
+  useRouter,
+  usePathname,
+  useSearchParams
+} from 'next/navigation'
 import { useAuth } from '../../lib/hooks/useAuth'
 
-export default function AuthLayout({
+function AuthLayoutContent({
   children,
 }: {
   children: React.ReactNode
@@ -14,45 +18,65 @@ export default function AuthLayout({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+
   const redirectingRef = useRef(false)
 
   useEffect(() => {
     if (redirectingRef.current) return
-    
+
     if (!loading && isAuthenticated) {
-      // Verificar se está na página de registro com parâmetro perfil
+
+      // Permitir o registo de novos utilizadores
+      // mesmo quando já existe uma sessão autenticada.
       if (pathname === '/register' && searchParams.has('perfil')) {
-        // Permitir acesso ao registro mesmo estando autenticado
-        // para criar novos transportadores, clientes, etc.
         return
       }
-      
-      // Redirecionar para dashboard apenas se não for registro com perfil
-      if (pathname?.startsWith('/login') || pathname === '/register') {
+
+      // Redireccionar utilizadores autenticados
+      // que tentem aceder ao login ou registo normal.
+      if (
+        pathname?.startsWith('/login') ||
+        pathname === '/register'
+      ) {
         redirectingRef.current = true
         router.replace('/dashboard')
       }
     }
-  }, [isAuthenticated, loading, router, pathname, searchParams])
+  }, [
+    isAuthenticated,
+    loading,
+    router,
+    pathname,
+    searchParams
+  ])
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="mt-4 text-gray-500">Carregando...</p>
+
+          <p className="mt-4 text-gray-500">
+            Carregando...
+          </p>
         </div>
       </div>
     )
   }
 
-  // Se estiver autenticado e na página de login, não renderizar
+  // Se estiver autenticado e na página de login,
+  // não apresentar o formulário.
   if (isAuthenticated && pathname?.startsWith('/login')) {
     return null
   }
 
-  // Se estiver autenticado e na página de registro sem parâmetro perfil, não renderizar
-  if (isAuthenticated && pathname === '/register' && !searchParams.has('perfil')) {
+  // Permitir o registo com perfil definido.
+  // Caso contrário, não apresentar o formulário.
+  if (
+    isAuthenticated &&
+    pathname === '/register' &&
+    !searchParams.has('perfil')
+  ) {
     return null
   }
 
@@ -64,5 +88,37 @@ export default function AuthLayout({
         </div>
       </div>
     </div>
+  )
+}
+
+// Fallback apresentado enquanto os parâmetros
+// da página estão a ser carregados.
+function AuthLayoutFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
+
+        <p className="mt-4 text-gray-500">
+          A carregar...
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// A fronteira Suspense deve envolver o componente
+// que utiliza useSearchParams().
+export default function AuthLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <Suspense fallback={<AuthLayoutFallback />}>
+      <AuthLayoutContent>
+        {children}
+      </AuthLayoutContent>
+    </Suspense>
   )
 }

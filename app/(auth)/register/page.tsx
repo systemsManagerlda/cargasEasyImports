@@ -1,7 +1,7 @@
-// app/(auth)/register/page.tsx
+
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '../../../lib/hooks/useAuth'
 import { authApi } from '../../../lib/api/auth'
@@ -10,10 +10,10 @@ import { Input } from '../../../components/ui/Input'
 import { Select } from '../../../components/ui/Select'
 import { Alert } from '../../../components/ui/Alert'
 import { Card, CardBody } from '../../../components/ui/Card'
-import { 
-  Package, 
-  Eye, 
-  EyeOff, 
+import {
+  Package,
+  Eye,
+  EyeOff,
   ArrowLeft,
   User,
   Mail,
@@ -30,16 +30,18 @@ const perfilOptions = [
   { value: 'transportador', label: 'Transportador' },
   { value: 'motorista', label: 'Motorista' },
   { value: 'analista', label: 'Analista' },
-  { value: 'suporte', label: 'Suporte' },
+  { value: 'suporte', label: 'Suporte' }
 ]
 
-export default function RegisterPage() {
+function RegisterContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+
   const perfilParam = searchParams.get('perfil')
   const fromParam = searchParams.get('from')
-  
+
   const { isAuthenticated, loading: authLoading } = useAuth()
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -47,9 +49,10 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   // Definir perfil inicial baseado no parâmetro
-  const perfilInicial = perfilParam && perfilOptions.some(p => p.value === perfilParam) 
-    ? perfilParam 
-    : 'cliente'
+  const perfilInicial =
+    perfilParam && perfilOptions.some(p => p.value === perfilParam)
+      ? perfilParam
+      : 'cliente'
 
   const [formData, setFormData] = useState({
     nomeUtilizador: '',
@@ -58,10 +61,10 @@ export default function RegisterPage() {
     confirmarPalavraPasse: '',
     nomeCompleto: '',
     telefone: '',
-    perfil: perfilInicial,
+    perfil: perfilInicial
   })
 
-  // Se já estiver autenticado e não for para criar usuário, redirecionar
+  // Se já estiver autenticado e não for para criar usuário, redireccionar
   useEffect(() => {
     if (!authLoading && isAuthenticated && !perfilParam) {
       router.replace('/dashboard')
@@ -79,10 +82,12 @@ export default function RegisterPage() {
     )
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [e.target.name]: e.target.value
     })
   }
 
@@ -91,7 +96,13 @@ export default function RegisterPage() {
     setError(null)
     setSuccess(null)
 
-    if (!formData.nomeUtilizador || !formData.email || !formData.palavraPasse || !formData.nomeCompleto || !formData.telefone) {
+    if (
+      !formData.nomeUtilizador ||
+      !formData.email ||
+      !formData.palavraPasse ||
+      !formData.nomeCompleto ||
+      !formData.telefone
+    ) {
       setError('Todos os campos são obrigatórios')
       return
     }
@@ -115,21 +126,23 @@ export default function RegisterPage() {
         palavraPasse: formData.palavraPasse,
         nomeCompleto: formData.nomeCompleto,
         telefone: formData.telefone,
-        perfil: formData.perfil,
+        perfil: formData.perfil
       })
 
       if (response.returnCode === 200 || response.returnCode === 201) {
-        const mensagem = formData.perfil === 'transportador'
-          ? 'Transportador criado com sucesso!'
-          : formData.perfil === 'cliente'
-          ? 'Cliente criado com sucesso!'
-          : formData.perfil === 'motorista'
-          ? 'Motorista criado com sucesso!'
-          : 'Usuário criado com sucesso!'
-        
-        setSuccess(mensagem + ' Redirecionando...')
+        const mensagem =
+          formData.perfil === 'transportador'
+            ? 'Transportador criado com sucesso!'
+            : formData.perfil === 'cliente'
+              ? 'Cliente criado com sucesso!'
+              : formData.perfil === 'motorista'
+                ? 'Motorista criado com sucesso!'
+                : 'Usuário criado com sucesso!'
+
+        setSuccess(mensagem + ' Redireccionando...')
+
         setTimeout(() => {
-          // Redirecionar para a página de origem
+          // Redireccionar para a página de origem
           if (fromParam === 'transportadores') {
             router.push('/transportadores')
           } else if (fromParam === 'clientes') {
@@ -145,7 +158,11 @@ export default function RegisterPage() {
       }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
-      setError(err.response?.data?.returnMsg || err.message || 'Erro ao criar usuário')
+      setError(
+        err.response?.data?.returnMsg ||
+        err.message ||
+        'Erro ao criar usuário'
+      )
     } finally {
       setLoading(false)
     }
@@ -156,32 +173,39 @@ export default function RegisterPage() {
     if (formData.perfil === 'transportador') {
       return 'Novo Transportador'
     }
+
     if (formData.perfil === 'motorista') {
       return 'Novo Motorista'
     }
+
     if (formData.perfil === 'cliente') {
       return 'Novo Cliente'
     }
+
     return 'Criar Conta'
   }
 
   const getSubtitle = () => {
     if (formData.perfil === 'transportador') {
-      return 'Registre um novo transportador no sistema'
+      return 'Registe um novo transportador no sistema'
     }
+
     if (formData.perfil === 'motorista') {
-      return 'Registre um novo motorista no sistema'
+      return 'Registe um novo motorista no sistema'
     }
+
     if (formData.perfil === 'cliente') {
-      return 'Registre um novo cliente no sistema'
+      return 'Registe um novo cliente no sistema'
     }
-    return 'Registre-se para acessar o sistema'
+
+    return 'Registe-se para aceder ao sistema'
   }
 
   const getIcon = () => {
     if (formData.perfil === 'transportador') {
       return <Truck className="w-12 h-12 text-gray-600" />
     }
+
     return <Package className="w-12 h-12 text-gray-600" />
   }
 
@@ -189,12 +213,15 @@ export default function RegisterPage() {
     if (formData.perfil === 'transportador') {
       return 'Criar Transportador'
     }
+
     if (formData.perfil === 'motorista') {
       return 'Criar Motorista'
     }
+
     if (formData.perfil === 'cliente') {
       return 'Criar Cliente'
     }
+
     return 'Criar Conta'
   }
 
@@ -202,13 +229,23 @@ export default function RegisterPage() {
     if (fromParam === 'transportadores') return '/transportadores'
     if (fromParam === 'clientes') return '/clientes'
     if (fromParam === 'motoristas') return '/motoristas'
+
     return '/login'
   }
 
   const getBackText = () => {
-    if (fromParam === 'transportadores') return 'Voltar para Transportadores'
-    if (fromParam === 'clientes') return 'Voltar para Clientes'
-    if (fromParam === 'motoristas') return 'Voltar para Motoristas'
+    if (fromParam === 'transportadores') {
+      return 'Voltar para Transportadores'
+    }
+
+    if (fromParam === 'clientes') {
+      return 'Voltar para Clientes'
+    }
+
+    if (fromParam === 'motoristas') {
+      return 'Voltar para Motoristas'
+    }
+
     return 'Voltar para o login'
   }
 
@@ -217,13 +254,18 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
         <Card className="w-full shadow-lg border border-gray-100">
           <CardBody className="p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
+
             <div className="text-center mb-6">
               <div className="flex justify-center mb-4">
                 <div className="p-3 bg-gray-100 rounded-full">
                   {getIcon()}
                 </div>
               </div>
-              <h2 className="text-2xl font-bold text-gray-800">{getTitle()}</h2>
+
+              <h2 className="text-2xl font-bold text-gray-800">
+                {getTitle()}
+              </h2>
+
               <p className="text-gray-500 text-sm mt-1">
                 {getSubtitle()}
               </p>
@@ -242,6 +284,7 @@ export default function RegisterPage() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
+
               <Input
                 label="Nome de Utilizador *"
                 type="text"
@@ -316,7 +359,11 @@ export default function RegisterPage() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
                   </button>
                 }
               />
@@ -334,10 +381,16 @@ export default function RegisterPage() {
                 rightIcon={
                   <button
                     type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    onClick={() =>
+                      setShowConfirmPassword(!showConfirmPassword)
+                    }
                     className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
                   >
-                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showConfirmPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
                   </button>
                 }
               />
@@ -369,9 +422,31 @@ export default function RegisterPage() {
                 Sistema de Rastreio de Cargas v1.0
               </p>
             </div>
+
           </CardBody>
         </Card>
       </div>
     </div>
+  )
+}
+
+function RegisterFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-gray-400 border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="mt-4 text-gray-500">
+          A carregar página de registo...
+        </p>
+      </div>
+    </div>
+  )
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<RegisterFallback />}>
+      <RegisterContent />
+    </Suspense>
   )
 }
