@@ -30,7 +30,7 @@ export function useCargaFormData(): UseCargaFormDataResult {
     try {
       const [clientesResponse, motoristasResponse] = await Promise.all([
         clienteApi.getList({ pageSize: 1000 }),
-        motoristaApi.getList({ pageSize: 1000 }),
+        motoristaApi.getAll({ ativo: true }),
       ]);
 
       if (clientesResponse.returnCode === 200) {
@@ -43,15 +43,9 @@ export function useCargaFormData(): UseCargaFormDataResult {
         );
       }
 
-      if (motoristasResponse.returnCode === 200) {
-        const listaMotoristas = motoristasResponse.data?.list || [];
-
-        setMotoristas(listaMotoristas);
-
-        console.log(
-          `✅ ${listaMotoristas.length} motoristas carregados`
-        );
-      }
+      const listaMotoristas = motoristasResponse;
+      setMotoristas(listaMotoristas);
+      console.log(`✅ ${listaMotoristas.length} motoristas carregados`);
     } catch (err: any) {
       const message =
         err?.response?.data?.returnMsg ||
@@ -90,7 +84,7 @@ export function useCargaFormData(): UseCargaFormDataResult {
 
   const getMotoristaById = useCallback(
     (id: string) => {
-      return motoristas.find((motorista) => motorista.motoristaId === id);
+      return motoristas.find((motorista) => motorista._id === id);
     },
     [motoristas]
   );

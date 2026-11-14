@@ -27,6 +27,7 @@ export interface LoginRequest {
 export interface LoginResponse {
   token: string;
   user: {
+    _id: string;
     utilizadorId: string;
     nomeUtilizador: string;
     email: string;
@@ -153,6 +154,7 @@ export interface Permissoes {
 // ================================================================
 
 export interface Utilizador {
+  _id?: string;
   utilizadorId: string;
   nomeUtilizador: string;
   email: string;

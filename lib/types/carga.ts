@@ -59,6 +59,7 @@ export interface Transportador {
 }
 
 export interface Motorista {
+  /** _id do documento Utilizador do motorista, convertido para string. */
   motoristaId?: string;
   nome: string;
   email?: string;

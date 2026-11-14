@@ -15,6 +15,7 @@ export interface LoginRequest {
 export interface LoginResponse {
   token: string;
   user: {
+    _id: string;
     utilizadorId: string;
     nomeUtilizador: string;
     email: string;
@@ -76,6 +77,7 @@ export interface LogoutResponse {
 }
 
 export interface UserProfile {
+  _id?: string;
   utilizadorId: string;
   nomeUtilizador: string;
   email: string;

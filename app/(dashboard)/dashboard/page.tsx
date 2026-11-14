@@ -3,6 +3,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ProtectedRoute } from '../../../components/common/ProtectedRoute'
 import {
   Card,
@@ -42,7 +43,8 @@ import {
 import { useAuth } from '../../../lib/hooks/useAuth'
 
 export default function DashboardPage() {
-  const { isAuthenticated, loading: authLoading } = useAuth()
+  const { isAuthenticated, loading: authLoading, user } = useAuth()
+  const router = useRouter()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -75,10 +77,14 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
+      if (user?.perfil === 'motorista') {
+        router.replace('/motorista')
+        return
+      }
       // eslint-disable-next-line react-hooks/set-state-in-effect
       load()
     }
-  }, [authLoading, isAuthenticated])
+  }, [authLoading, isAuthenticated, user?.perfil, router])
 
   if (authLoading || loading) {
     return (

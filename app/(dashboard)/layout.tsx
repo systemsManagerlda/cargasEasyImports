@@ -10,19 +10,34 @@ import { Menu } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading } = useAuth()
+  const { isAuthenticated, loading, user } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const redirectingRef = useRef(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   useEffect(() => {
-    if (redirectingRef.current) return
-    if (!loading && !isAuthenticated && pathname?.startsWith('/dashboard')) {
+    if (redirectingRef.current || loading) return
+
+    if (!isAuthenticated) {
       redirectingRef.current = true
       router.replace('/login')
+      return
     }
-  }, [isAuthenticated, loading, router, pathname])
+
+    // O motorista utiliza exclusivamente a área operacional própria.
+    if (user?.perfil === 'motorista' && !pathname?.startsWith('/motorista') && pathname !== '/perfil') {
+      redirectingRef.current = true
+      router.replace('/motorista')
+      return
+    }
+
+    // Os restantes perfis não devem entrar no painel exclusivo do motorista.
+    if (user?.perfil !== 'motorista' && pathname?.startsWith('/motorista')) {
+      redirectingRef.current = true
+      router.replace('/dashboard')
+    }
+  }, [isAuthenticated, loading, router, pathname, user?.perfil])
 
   useEffect(() => {
     const handleResize = () => { if (window.innerWidth >= 1024) setIsMobileMenuOpen(false) }

@@ -37,3 +37,15 @@ O mapa do frontend prioriza `coordenadasRota`; quando não existem pontos sufici
 ## Autenticação e acesso
 
 Os perfis definidos pelo schema são `administrador_principal`, `administrador`, `cliente`, `transportador`, `motorista`, `analista` e `suporte`. O frontend mantém o controlo por sessão/permissões e usa as rotas de autenticação já existentes.
+
+
+## Motoristas — identificador MongoDB
+
+- `/getMotoristaListA` recebe `curPage`, `pageSize`, `search` e `ativo`; o backend limita `pageSize` a 100.
+- Cada registo devolvido por `respostaGestao()` inclui `_id` do documento `Utilizador`.
+- O frontend usa esse `_id` para seleccionar, consultar e actualizar motoristas.
+- `/getMotoristaDetailA` e `/updateMotoristaA` recebem o `_id` no campo de pedido `motoristaId`; no backend, esse valor deve ser aplicado ao filtro `_id`.
+- Nas cargas, `motorista.motoristaId` guarda o `_id` convertido para string.
+- Na autenticação, `req.user.motoristaId` deve ser normalizado para o mesmo `_id` quando o perfil é `motorista`.
+- `/getCargaListA` deve filtrar cargas pelo utilizador autenticado; o motorista não deve conseguir substituir esse filtro enviando outro `motoristaId`.
+- O backend fornecido não inclui uma rota de eliminação de motoristas. O frontend não deve assumir que `/deleteMotoristaA` existe.

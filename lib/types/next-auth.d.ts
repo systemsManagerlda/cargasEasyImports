@@ -2,6 +2,7 @@ import type { DefaultJWT } from 'next-auth/jwt';
 
 export interface AppUser {
   id: string;
+  _id: string;
   utilizadorId: string;
   nomeUtilizador: string;
   email: string;

@@ -7,6 +7,7 @@ import { useState, useCallback } from 'react';
 
 export interface AppUser {
   id: string;
+  _id: string;
   utilizadorId: string;
   nomeUtilizador: string;
   email: string;

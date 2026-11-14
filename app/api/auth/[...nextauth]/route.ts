@@ -15,6 +15,7 @@ import { API_ENDPOINTS } from "../../../../lib/api/endpoints";
 
 interface AppUser {
   id: string;
+  _id: string;
   utilizadorId: string;
   nomeUtilizador: string;
   email: string;
@@ -36,6 +37,7 @@ interface LoginResponseData {
   token: string;
 
   user: {
+    _id: string;
     utilizadorId: string;
     nomeUtilizador: string;
     email: string;
@@ -59,6 +61,7 @@ interface LoginResponseData {
 declare module "next-auth" {
   interface User extends DefaultUser {
     id: string;
+    _id: string;
 
     utilizadorId: string;
     nomeUtilizador: string;
@@ -97,6 +100,7 @@ declare module "next-auth/jwt" {
 
     user?: {
       id: string;
+      _id: string;
 
       utilizadorId: string;
       nomeUtilizador: string;
@@ -214,6 +218,12 @@ export const authOptions: NextAuthOptions = {
       );
     }
 
+    if (user.perfil === "motorista" && !user._id) {
+      throw new Error(
+        "A API não devolveu o _id MongoDB do motorista. Confirme a resposta da rota de login."
+      );
+    }
+
     console.log(
       "✅ Login API realizado:",
       user.nomeUtilizador
@@ -253,6 +263,7 @@ export const authOptions: NextAuthOptions = {
 
     return {
       id: user.utilizadorId,
+      _id: String(user._id || ""),
 
       utilizadorId:
         user.utilizadorId,
@@ -276,7 +287,7 @@ export const authOptions: NextAuthOptions = {
         user.transportadorId,
 
       motoristaId:
-        user.motoristaId,
+        user.perfil === "motorista" ? String(user._id) : user.motoristaId,
 
       permissoes:
         user.permissoes,
@@ -332,6 +343,7 @@ export const authOptions: NextAuthOptions = {
 
         token.user = {
           id: user.id,
+          _id: user._id,
 
           utilizadorId:
             user.utilizadorId,

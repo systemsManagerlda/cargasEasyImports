@@ -3,6 +3,7 @@
 // ================================================================
 
 export interface User {
+  _id?: string;
   utilizadorId: string;
   nomeUtilizador: string;
   email: string;
@@ -174,6 +175,7 @@ export interface UserPermissions {
   criarCarga: boolean;
   editarCarga: boolean;
   eliminarCarga: boolean;
+  atualizarStatusCarga: boolean;
   
   // Clientes
   verTodosClientes: boolean;
@@ -210,6 +212,7 @@ export interface UserPermissions {
   confirmarEntrega: boolean;
   gerarRelatorios: boolean;
   verTodosRelatorios: boolean;
+  adicionarEtapa: boolean;
   
   // Documentos
   verDocumentosCarga: boolean;
@@ -280,6 +283,8 @@ export const DEFAULT_PERMISSIONS: UserPermissions = {
   configurarSistema: false,
   verAlertasTodasCargas: false,
   configurarAlertas: false,
+  adicionarEtapa: false,
+  atualizarStatusCarga: false
 };
 
 // ================================================================

@@ -7,6 +7,7 @@ import { ProtectedRoute } from "../../../components/common/ProtectedRoute";
 import { apiClient } from "../../../lib/api/client";
 
 type Motorista = {
+  _id: string;
   utilizadorId: string;
   motoristaId?: string;
   nomeCompleto: string;
@@ -92,7 +93,7 @@ export default function MotoristasPage() {
     setNotice("");
     try {
       const response = await apiClient.post<ApiResponse<Motorista>>("/getMotoristaDetailA", {
-        utilizadorId: item.utilizadorId,
+        motoristaId: item._id,
       });
       const body: any = response?.data?.returnCode !== undefined ? response.data : response;
       if (body.returnCode !== 200) throw new Error(body.returnMsg || "Erro ao consultar motorista.");
@@ -119,7 +120,7 @@ export default function MotoristasPage() {
     setNotice("");
     try {
       const response = await apiClient.post<ApiResponse<Motorista>>("/updateMotoristaA", {
-        utilizadorId: selected.utilizadorId,
+        motoristaId: selected._id,
         nomeCompleto: form.nomeCompleto.trim(),
         email: form.email.trim(),
         telefone: form.telefone.trim(),
@@ -267,7 +268,7 @@ export default function MotoristasPage() {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {items.map((m) => (
-                        <tr key={m.utilizadorId} className="transition hover:bg-slate-50/70">
+                        <tr key={m._id} className="transition hover:bg-slate-50/70">
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-3">
                               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">{initials(m.nomeCompleto)}</div>
@@ -278,7 +279,7 @@ export default function MotoristasPage() {
                             </div>
                           </td>
                           <td className="px-5 py-4 text-slate-600">{m.telefone || "—"}</td>
-                          <td className="px-5 py-4 font-mono text-xs text-slate-500">{m.motoristaId || m.utilizadorId}</td>
+                          <td className="px-5 py-4 font-mono text-xs text-slate-500">{m._id}</td>
                           <td className="px-5 py-4">
                             <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${isActive(m) ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
                               <span className={`h-1.5 w-1.5 rounded-full ${isActive(m) ? "bg-emerald-500" : "bg-slate-400"}`} />
@@ -297,7 +298,7 @@ export default function MotoristasPage() {
                 </div>
                 <div className="divide-y divide-slate-100 md:hidden">
                   {items.map((m) => (
-                    <article key={m.utilizadorId} className="flex items-start gap-3 p-4">
+                    <article key={m._id} className="flex items-start gap-3 p-4">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">{initials(m.nomeCompleto)}</div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
@@ -334,7 +335,7 @@ export default function MotoristasPage() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">Perfil do motorista</p>
                   <h2 className="mt-1 text-xl font-bold text-slate-900">Dados do motorista</h2>
-                  <p className="mt-1 font-mono text-[11px] text-slate-400">{selected.motoristaId || selected.utilizadorId}</p>
+                  <p className="mt-1 font-mono text-[11px] text-slate-400">{selected._id}</p>
                 </div>
                 <button type="button" onClick={() => setSelected(null)} aria-label="Fechar" className="rounded-lg p-2 text-xl leading-none text-slate-400 transition hover:bg-slate-200 hover:text-slate-700">×</button>
               </div>

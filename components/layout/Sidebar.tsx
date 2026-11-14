@@ -40,53 +40,71 @@ export const Sidebar: React.FC<{
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  const navItems = [
-    {
-      label: "Visão geral",
-      icon: <LayoutDashboard className="w-[19px] h-[19px]" />,
-      href: "/dashboard",
-    },
-    {
-      label: "Cargas",
-      icon: <Package className="w-[19px] h-[19px]" />,
-      href: "/cargas",
-    },
-    {
-      label: "Transportadores",
-      icon: <Truck className="w-[19px] h-[19px]" />,
-      href: "/transportadores",
-    },
-    {
-      label: "Motoristas",
-      icon: <UserRound className="w-[19px] h-[19px]" />,
-      href: "/motoristas",
-    },
-    {
-      label: "Clientes",
-      icon: <Users className="w-[19px] h-[19px]" />,
-      href: "/clientes",
-    },
-    {
-      label: "Alertas",
-      icon: <AlertTriangle className="w-[19px] h-[19px]" />,
-      href: "/alertas",
-    },
-    {
-      label: "Relatórios",
-      icon: <FileText className="w-[19px] h-[19px]" />,
-      href: "/relatorios",
-    },
-    ...(user?.perfil === "administrador_principal" ||
-    user?.perfil === "administrador"
-      ? [
-          {
-            label: "Configurações",
-            icon: <Settings className="w-[19px] h-[19px]" />,
-            href: "/configuracoes",
-          },
-        ]
-      : []),
-  ];
+  const isDriver = user?.perfil === "motorista";
+
+  const navItems = isDriver
+    ? [
+        {
+          label: "Meu painel",
+          icon: <LayoutDashboard className="w-[19px] h-[19px]" />,
+          href: "/motorista",
+        },
+        {
+          label: "Minhas cargas",
+          icon: <Package className="w-[19px] h-[19px]" />,
+          href: "/motorista/cargas",
+        },
+        {
+          label: "Histórico de registos",
+          icon: <FileText className="w-[19px] h-[19px]" />,
+          href: "/motorista/historico",
+        },
+        {
+          label: "Meu perfil",
+          icon: <UserRound className="w-[19px] h-[19px]" />,
+          href: "/perfil",
+        },
+      ]
+    : [
+        {
+          label: "Visão geral",
+          icon: <LayoutDashboard className="w-[19px] h-[19px]" />,
+          href: "/dashboard",
+        },
+        {
+          label: "Cargas",
+          icon: <Package className="w-[19px] h-[19px]" />,
+          href: "/cargas",
+        },
+        {
+          label: "Transportadores",
+          icon: <Truck className="w-[19px] h-[19px]" />,
+          href: "/transportadores",
+        },
+        {
+          label: "Motoristas",
+          icon: <UserRound className="w-[19px] h-[19px]" />,
+          href: "/motoristas",
+        },
+        {
+          label: "Clientes",
+          icon: <Users className="w-[19px] h-[19px]" />,
+          href: "/clientes",
+        },
+        {
+          label: "Alertas",
+          icon: <AlertTriangle className="w-[19px] h-[19px]" />,
+          href: "/alertas",
+        },
+        {
+          label: "Relatórios",
+          icon: <FileText className="w-[19px] h-[19px]" />,
+          href: "/relatorios",
+        },
+        ...(user?.perfil === "administrador_principal" || user?.perfil === "administrador"
+          ? [{ label: "Configurações", icon: <Settings className="w-[19px] h-[19px]" />, href: "/configuracoes" }]
+          : []),
+      ];
 
   return (
     <>
@@ -111,7 +129,7 @@ export const Sidebar: React.FC<{
           )}
         >
           <Link
-            href="/dashboard"
+            href={isDriver ? "/motorista" : "/dashboard"}
             className="flex items-center gap-3"
             onClick={() => isMobile && onMobileClose?.()}
           >
@@ -150,7 +168,7 @@ export const Sidebar: React.FC<{
           )}
         </div>
         <div className="px-3 pt-5">
-          {(!collapsed || isMobile) && (
+          {(!collapsed || isMobile) && !isDriver && (
             <Link
               href="/rastrear"
               className="flex items-center gap-2 px-3 py-2.5 mb-4 rounded-xl bg-white/5 border border-white/10 text-sm text-slate-200 hover:bg-white/10"
@@ -162,12 +180,12 @@ export const Sidebar: React.FC<{
         </div>
         <nav className="flex-1 px-3 py-2 overflow-y-auto">
           <div className="text-[10px] font-semibold uppercase tracking-[.2em] text-slate-500 px-3 mb-2">
-            Operação
+            {isDriver ? "Área do motorista" : "Operação"}
           </div>
           <ul className="space-y-1">
             {navItems.map((item) => {
               const active =
-                pathname === item.href || pathname?.startsWith(item.href + "/");
+                pathname === item.href || (item.href !== "/motorista" && item.href.startsWith("/") && !item.href.includes("#") && pathname?.startsWith(item.href + "/"));
               return (
                 <li key={item.href}>
                   <Link

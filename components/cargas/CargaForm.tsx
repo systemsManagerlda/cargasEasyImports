@@ -230,7 +230,7 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
   }));
 
   const motoristaOptions = motoristas.map(m => ({
-    value: m.motoristaId,
+    value: m._id,
     label: m.nome,
     sublabel: `${m.telefone} • ${m.cartaConducao || 'Sem carta'}`,
     data: m,
@@ -247,7 +247,7 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
 
     try {
       const cliente = clientes.find(c => c.clienteId === data.clienteId);
-      const motorista = motoristas.find(m => m.motoristaId === data.motoristaId);
+      const motorista = motoristas.find(m => m._id === data.motoristaId);
       const transportador = transportadores.find(
         (t) => t.transportadorId === data.transportadorId
       );
@@ -338,7 +338,7 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
         
         // Motorista
         motorista: {
-          motoristaId: data.motoristaId || undefined,
+          motoristaId: motorista._id,
           nome: motorista.nome,
           email: motorista.email || '',
           telefone: motorista.telefone || '',
