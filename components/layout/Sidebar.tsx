@@ -18,6 +18,7 @@ import {
   ChevronRight,
   Radio,
   Search,
+  HelpCircle,
 } from "lucide-react";
 import { cn } from "../../lib/utils/cn";
 import { useAuth } from "../../lib/hooks/useAuth";
@@ -32,6 +33,7 @@ export const Sidebar: React.FC<{
   const { logout, user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [currentHash, setCurrentHash] = useState("");
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 1024);
@@ -40,7 +42,24 @@ export const Sidebar: React.FC<{
     return () => window.removeEventListener("resize", check);
   }, []);
 
+  useEffect(() => {
+  const actualizarHash = () => {
+    setCurrentHash(window.location.hash);
+  };
+
+  actualizarHash();
+
+  window.addEventListener("hashchange", actualizarHash);
+  window.addEventListener("popstate", actualizarHash);
+
+    return () => {
+      window.removeEventListener("hashchange", actualizarHash);
+      window.removeEventListener("popstate", actualizarHash);
+    };
+  }, [pathname]);
+
   const isDriver = user?.perfil === "motorista";
+  const isClient = user?.perfil === "cliente";
 
   const navItems = isDriver
     ? [
@@ -63,6 +82,34 @@ export const Sidebar: React.FC<{
           label: "Meu perfil",
           icon: <UserRound className="w-[19px] h-[19px]" />,
           href: "/perfil",
+        },
+      ]
+    : isClient
+    ? [
+        {
+          label: "Meu painel",
+          icon: <LayoutDashboard className="w-[19px] h-[19px]" />,
+          href: "/cliente",
+        },
+        {
+          label: "Minhas cargas",
+          icon: <Package className="w-[19px] h-[19px]" />,
+          href: "/cliente#cargas",
+        },
+        {
+          label: "Rastrear carga",
+          icon: <Search className="w-[19px] h-[19px]" />,
+          href: "/rastrear",
+        },
+        {
+          label: "Meu perfil",
+          icon: <UserRound className="w-[19px] h-[19px]" />,
+          href: "/perfil",
+        },
+        {
+          label: "Ajuda",
+          icon: <HelpCircle className="w-[19px] h-[19px]" />,
+          href: "/ajuda",
         },
       ]
     : [
@@ -129,7 +176,7 @@ export const Sidebar: React.FC<{
           )}
         >
           <Link
-            href={isDriver ? "/motorista" : "/dashboard"}
+            href={isDriver ? "/motorista" : isClient ? "/cliente" : "/dashboard"}
             className="flex items-center gap-3"
             onClick={() => isMobile && onMobileClose?.()}
           >
@@ -180,17 +227,29 @@ export const Sidebar: React.FC<{
         </div>
         <nav className="flex-1 px-3 py-2 overflow-y-auto">
           <div className="text-[10px] font-semibold uppercase tracking-[.2em] text-slate-500 px-3 mb-2">
-            {isDriver ? "Área do motorista" : "Operação"}
+            {isDriver ? "Área do motorista" : isClient ? "Área do cliente" : "Operação"}
           </div>
           <ul className="space-y-1">
             {navItems.map((item) => {
-              const active =
-                pathname === item.href || (item.href !== "/motorista" && item.href.startsWith("/") && !item.href.includes("#") && pathname?.startsWith(item.href + "/"));
+              const [itemPath, itemHash] = item.href.split("#");
+              const active = itemHash
+                ? pathname === itemPath && currentHash === `#${itemHash}`
+                : (pathname === itemPath && !currentHash) ||
+                  (itemPath !== "/motorista" &&
+                    pathname?.startsWith(itemPath + "/"));
               return (
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    onClick={() => isMobile && onMobileClose?.()}
+                    onClick={() => {
+                      const hash = item.href.includes("#")
+                        ? `#${item.href.split("#")[1]}`
+                        : "";
+                      setCurrentHash(hash);
+                      if (isMobile) {
+                        onMobileClose?.();
+                      }
+                    }}
                     className={cn(
                       "flex items-center gap-3 px-3 py-3 rounded-xl transition-all",
                       active

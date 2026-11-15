@@ -81,6 +81,10 @@ export default function DashboardPage() {
         router.replace('/motorista')
         return
       }
+      if (user?.perfil === 'cliente') {
+        router.replace('/cliente')
+        return
+      }
       // eslint-disable-next-line react-hooks/set-state-in-effect
       load()
     }

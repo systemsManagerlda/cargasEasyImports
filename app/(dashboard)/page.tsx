@@ -7,17 +7,17 @@ import { LoadingScreen } from '../../components/common/LoadingScreen';
 
 export default function DashboardRootPage() {
   const router = useRouter();
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
 
   useEffect(() => {
     if (loading) return;
 
     if (isAuthenticated) {
-      router.replace('/dashboard');
+      router.replace(user?.perfil === 'motorista' ? '/motorista' : user?.perfil === 'cliente' ? '/cliente' : '/dashboard');
     } else {
       router.replace('/login');
     }
-  }, [isAuthenticated, loading, router]);
+  }, [isAuthenticated, loading, router, user?.perfil]);
 
   if (loading) {
     return <LoadingScreen />;

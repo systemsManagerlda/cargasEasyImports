@@ -4,6 +4,7 @@ export const API_ENDPOINTS = {
   LOGOUT: '/auth/logoutCarga',
   REGISTER: '/auth/registerCarga',
   REFRESH_TOKEN: '/auth/refresh',
+  CLIENTES_BY_CARGA: '/getClienteListCarga',
   
   // Cargas
   CARGAS: '/getCargaListA',

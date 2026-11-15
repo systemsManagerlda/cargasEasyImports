@@ -25,15 +25,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       return
     }
 
-    // O motorista utiliza exclusivamente a área operacional própria.
+    // Cada perfil utiliza a sua área própria.
     if (user?.perfil === 'motorista' && !pathname?.startsWith('/motorista') && pathname !== '/perfil') {
       redirectingRef.current = true
       router.replace('/motorista')
       return
     }
 
-    // Os restantes perfis não devem entrar no painel exclusivo do motorista.
+    if (user?.perfil === 'cliente' && !pathname?.startsWith('/cliente') && pathname !== '/perfil' && pathname !== '/ajuda' && pathname !== '/rastrear' && !pathname?.startsWith('/cargas/')) {
+      redirectingRef.current = true
+      router.replace('/cliente')
+      return
+    }
+
+    // Impedir que outros perfis entrem nas áreas exclusivas.
     if (user?.perfil !== 'motorista' && pathname?.startsWith('/motorista')) {
+      redirectingRef.current = true
+      router.replace(user?.perfil === 'cliente' ? '/cliente' : '/dashboard')
+      return
+    }
+
+    if (user?.perfil !== 'cliente' && pathname?.startsWith('/cliente')) {
       redirectingRef.current = true
       router.replace('/dashboard')
     }

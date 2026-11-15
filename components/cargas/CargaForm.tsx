@@ -1,3 +1,4 @@
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
@@ -6,50 +7,57 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { AutocompleteSelect } from '@/components/ui/AutocompleteSelect';
 import { Alert } from '@/components/ui/Alert';
+
 import { cargaApi } from '@/lib/api/cargas';
+import { clienteApi, Cliente } from '@/lib/api/clientes';
 import { apiClient } from '@/lib/api/client';
 import { useCargaFormData } from '@/lib/hooks/useCargaFormData';
-import { 
-  Package, 
-  MapPin, 
-  User, 
-  Truck, 
-  DollarSign, 
+import { CreateCargaData } from '@/lib/types/carga';
+
+import {
+  Package,
+  MapPin,
+  User,
+  Truck,
+  DollarSign,
   Weight,
   Ruler,
-  Phone,
   Building,
   Map,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
 } from 'lucide-react';
-import { CreateCargaData } from '@/lib/types/carga';
 
-// Schema de validação
+// ============================================================
+// VALIDAÇÃO DO FORMULÁRIO
+// ============================================================
+
 const cargaSchema = z.object({
   descricao: z.string().min(3, 'Descrição deve ter pelo menos 3 caracteres'),
-  tipoMercadoria: z.string().min(1, 'Selecione o tipo de mercadoria'),
+  tipoMercadoria: z.string().min(1, 'Seleccione o tipo de mercadoria'),
+
   peso: z.coerce.number().min(0.1, 'Peso deve ser maior que 0'),
   volume: z.coerce.number().min(0.1, 'Volume deve ser maior que 0'),
   valorDeclarado: z.coerce.number().min(0, 'Valor deve ser maior ou igual a 0'),
-  
+
   origemEndereco: z.string().min(3, 'Endereço de origem é obrigatório'),
   origemCidade: z.string().min(2, 'Cidade de origem é obrigatória'),
   origemPais: z.string().min(2, 'País de origem é obrigatório'),
-  
+
   destinoEndereco: z.string().min(3, 'Endereço de destino é obrigatório'),
   destinoCidade: z.string().min(2, 'Cidade de destino é obrigatória'),
   destinoPais: z.string().min(2, 'País de destino é obrigatório'),
-  
-  clienteId: z.string().min(1, 'Selecione um cliente'),
-  transportadorId: z.string().min(1, 'Selecione um transportador'),
-  motoristaId: z.string().min(1, 'Selecione um motorista'),
-  
+
+  clienteId: z.string().min(1, 'Seleccione um cliente'),
+  transportadorId: z.string().min(1, 'Seleccione um transportador'),
+  motoristaId: z.string().min(1, 'Seleccione um motorista'),
+
   viaturaMatricula: z.string().min(3, 'Matrícula da viatura é obrigatória'),
   viaturaMarca: z.string().optional(),
   viaturaModelo: z.string().optional(),
@@ -61,14 +69,17 @@ const cargaSchema = z.object({
 
 type CargaFormData = z.infer<typeof cargaSchema>;
 
-// Opções
+// ============================================================
+// OPÇÕES
+// ============================================================
+
 const tipoMercadoriaOptions = [
   { value: 'alimentos', label: 'Alimentos' },
   { value: 'bebidas', label: 'Bebidas' },
   { value: 'produtos_quimicos', label: 'Produtos Químicos' },
   { value: 'produtos_perigosos', label: 'Produtos Perigosos' },
   { value: 'materiais_construcao', label: 'Materiais de Construção' },
-  { value: 'eletronicos', label: 'Eletrônicos' },
+  { value: 'eletronicos', label: 'Electrónicos' },
   { value: 'moveis', label: 'Móveis' },
   { value: 'veiculos', label: 'Veículos' },
   { value: 'medicamentos', label: 'Medicamentos' },
@@ -109,6 +120,10 @@ const tipoViaturaOptions = [
   { value: 'outro', label: 'Outro' },
 ];
 
+// ============================================================
+// INTERFACES
+// ============================================================
+
 interface Transportador {
   transportadorId: string;
   nome: string;
@@ -120,43 +135,65 @@ interface Transportador {
   ativo?: boolean;
 }
 
-interface TransportadorListData {
-  list: Transportador[];
-  totalCount: number;
-  totalPage: number;
-  curPage: number;
-  pageSize: number;
-}
-
 interface CargaFormProps {
   onSuccess?: (cargaId: string) => void;
 }
 
+// ============================================================
+// COMPONENTE
+// ============================================================
+
 export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
   const router = useRouter();
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ----------------------------------------------------------
+  // CLIENTES
+  // ----------------------------------------------------------
+
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [loadingClientes, setLoadingClientes] = useState(true);
+  const [clienteError, setClienteError] = useState<string | null>(null);
+
+  const hasClientes = clientes.length > 0;
+
+  // ----------------------------------------------------------
+  // MOTORISTAS
+  // ----------------------------------------------------------
+
+  const {
+    motoristas,
+    loading: loadingMotoristas,
+    error: dataError,
+    fetchData,
+    hasMotoristas,
+  } = useCargaFormData();
+
+  // ----------------------------------------------------------
+  // TRANSPORTADORES
+  // ----------------------------------------------------------
+
   const [transportadores, setTransportadores] = useState<Transportador[]>([]);
   const [loadingTransportadores, setLoadingTransportadores] = useState(true);
   const [transportadorError, setTransportadorError] = useState<string | null>(null);
 
-  const {
-    clientes,
-    motoristas,
-    loading: loadingData,
-    error: dataError,
-    fetchData,
-    hasClientes,
-    hasMotoristas,
-  } = useCargaFormData();
+  // ----------------------------------------------------------
+  // FORMULÁRIO
+  // ----------------------------------------------------------
 
-  const { 
-    register, 
-    handleSubmit, 
+  const {
+    register,
+    handleSubmit,
     formState: { errors },
     setValue,
     watch,
-  } = useForm<z.input<typeof cargaSchema>, any, z.output<typeof cargaSchema>>({
+  } = useForm<
+    z.input<typeof cargaSchema>,
+    any,
+    z.output<typeof cargaSchema>
+  >({
     resolver: zodResolver(cargaSchema),
     defaultValues: {
       origemPais: 'Moçambique',
@@ -166,16 +203,101 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
     },
   });
 
-  // Carregar transportadores reais através da API.
+  // ============================================================
+  // CARREGAR CLIENTES DA BASE DE DADOS
+  // ============================================================
+
   useEffect(() => {
     let cancelled = false;
 
-    const loadTransportadores = async () => {
+    const carregarClientes = async () => {
+      setLoadingClientes(true);
+      setClienteError(null);
+
+      try {
+        const listaCompleta: Cliente[] = [];
+
+        let pagina = 1;
+        let totalPaginas = 1;
+
+        do {
+          const response = await clienteApi.getList({
+            curPage: pagina,
+            pageSize: 100,
+            ativo: true,
+          });
+
+          if (response.returnCode !== 200) {
+            throw new Error(
+              response.returnMsg || 'Não foi possível carregar os clientes.'
+            );
+          }
+
+          const lista = response.data?.list || [];
+
+          listaCompleta.push(...lista);
+
+          totalPaginas = Math.max(
+            1,
+            Number(response.data?.totalPage || 1)
+          );
+
+          pagina++;
+
+        } while (pagina <= totalPaginas);
+
+        if (!cancelled) {
+          // Apenas clientes activos
+          const clientesActivos = listaCompleta.filter(
+            (cliente) =>
+              cliente.ativo === true &&
+              (!cliente.estadoConta || cliente.estadoConta === 'ativo')
+          );
+
+          setClientes(clientesActivos);
+        }
+
+      } catch (err: any) {
+        console.error('Erro ao carregar clientes:', err);
+
+        if (!cancelled) {
+          setClienteError(
+            err.response?.data?.returnMsg ||
+            err.response?.data?.mensagem ||
+            err.message ||
+            'Não foi possível carregar os clientes.'
+          );
+
+          setClientes([]);
+        }
+
+      } finally {
+        if (!cancelled) {
+          setLoadingClientes(false);
+        }
+      }
+    };
+
+    carregarClientes();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ============================================================
+  // CARREGAR TRANSPORTADORES DA BASE DE DADOS
+  // ============================================================
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const carregarTransportadores = async () => {
       setLoadingTransportadores(true);
       setTransportadorError(null);
 
       try {
-        const response = await apiClient.post<TransportadorListData>(
+        const response = await apiClient.post<any>(
           '/getTransportadorList',
           {
             curPage: 1,
@@ -185,24 +307,35 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
           }
         );
 
-        if (response.returnCode !== 200) {
-          throw new Error(response.returnMsg || 'Não foi possível carregar os transportadores.');
+        const body =
+          response?.data?.returnCode !== undefined
+            ? response.data
+            : response;
+
+        if (body.returnCode !== 200) {
+          throw new Error(
+            body.returnMsg || 'Não foi possível carregar os transportadores.'
+          );
         }
 
         if (!cancelled) {
-          setTransportadores(response.data?.list || []);
+          setTransportadores(body.data?.list || []);
         }
+
       } catch (err: any) {
         console.error('Erro ao carregar transportadores:', err);
 
         if (!cancelled) {
           setTransportadorError(
             err.response?.data?.returnMsg ||
+            err.response?.data?.mensagem ||
             err.message ||
             'Não foi possível carregar os transportadores.'
           );
+
           setTransportadores([]);
         }
+
       } finally {
         if (!cancelled) {
           setLoadingTransportadores(false);
@@ -210,35 +343,50 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
       }
     };
 
-    loadTransportadores();
+    carregarTransportadores();
 
     return () => {
       cancelled = true;
     };
   }, []);
 
+  // ============================================================
+  // OPÇÕES DOS CAMPOS DE SELECÇÃO
+  // ============================================================
+
+  const clienteOptions = clientes.map((cliente) => ({
+    value: cliente.clienteId || cliente.utilizadorId || '',
+    label: cliente.nome,
+    sublabel: `${cliente.email || 'Sem e-mail'} • ${cliente.telefone || 'Sem telefone'}`,
+    data: cliente,
+  }));
+
   const transportadorOptions = transportadores.map((transportador) => ({
     value: transportador.transportadorId,
     label: transportador.nome,
   }));
 
-  const clienteOptions = clientes.map(c => ({
-    value: c.clienteId,
-    label: c.nome,
-    sublabel: `${c.email} • ${c.telefone}`,
-    data: c,
+  const motoristaOptions = motoristas.map((motorista) => ({
+    value: motorista._id,
+    label: motorista.nome,
+    sublabel: `${motorista.telefone || 'Sem telefone'} • ${motorista.cartaConducao || 'Sem carta'}`,
+    data: motorista,
   }));
 
-  const motoristaOptions = motoristas.map(m => ({
-    value: m._id,
-    label: m.nome,
-    sublabel: `${m.telefone} • ${m.cartaConducao || 'Sem carta'}`,
-    data: m,
-  }));
+  // ============================================================
+  // CRIAR CARGA
+  // ============================================================
 
   const onSubmit = async (data: CargaFormData) => {
+    if (loadingClientes || loadingMotoristas || loadingTransportadores) {
+      setError('Aguarde até que todos os dados sejam carregados.');
+      return;
+    }
+
     if (!hasClientes || !hasMotoristas || transportadores.length === 0) {
-      setError('Não é possível criar a carga. Confirme se existem clientes, motoristas e transportadores activos registados.');
+      setError(
+        'Não é possível criar a carga. Confirme se existem clientes, motoristas e transportadores activos registados.'
+      );
       return;
     }
 
@@ -246,33 +394,40 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
     setLoading(true);
 
     try {
-      const cliente = clientes.find(c => c.clienteId === data.clienteId);
-      const motorista = motoristas.find(m => m._id === data.motoristaId);
+      const cliente = clientes.find(
+        (c) =>
+          c.clienteId === data.clienteId ||
+          c.utilizadorId === data.clienteId
+      );
+
+      const motorista = motoristas.find(
+        (m) => m._id === data.motoristaId
+      );
+
       const transportador = transportadores.find(
         (t) => t.transportadorId === data.transportadorId
       );
 
       if (!cliente || !motorista || !transportador) {
-        setError('Cliente, motorista ou transportador não encontrado.');
-        setLoading(false);
-        return;
+        throw new Error(
+          'Cliente, motorista ou transportador não encontrado.'
+        );
       }
 
-      // ============================================================
-      // PAYLOAD COMPLETO - COM CODIGO RASTREIO
-      // ============================================================
+      // --------------------------------------------------------
+      // PAYLOAD DA CARGA
+      // --------------------------------------------------------
+
       const payload: CreateCargaData = {
-        // CODIGO DE RASTREIO - GERADO MANUALMENTE
-        
-        // Campos obrigatórios da carga
         descricao: data.descricao,
         tipoMercadoria: data.tipoMercadoria || 'outros',
         peso: data.peso,
         volume: data.volume,
         valorDeclarado: data.valorDeclarado,
+
         unidadeMedidaPeso: 'kg',
         unidadeMedidaVolume: 'm3',
-        
+
         // ORIGEM
         origem: {
           endereco: data.origemEndereco,
@@ -280,20 +435,24 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
           pais: data.origemPais || 'Moçambique',
           estado: '',
           codigoPostal: '',
+
           coordenadas: {
             latitude: -25.969248,
             longitude: 32.573174,
           },
+
           pontoReferencia: '',
+
           contacto: {
             nome: '',
             telefone: '',
             email: '',
           },
+
           dataHoraPrevistaSaida: null,
           dataHoraRealSaida: null,
         },
-        
+
         // DESTINO
         destino: {
           endereco: data.destinoEndereco,
@@ -301,31 +460,35 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
           pais: data.destinoPais || 'Moçambique',
           estado: '',
           codigoPostal: '',
+
           coordenadas: {
             latitude: -19.833333,
             longitude: 34.85,
           },
+
           pontoReferencia: '',
+
           contacto: {
             nome: '',
             telefone: '',
             email: '',
           },
+
           dataHoraPrevistaChegada: null,
           dataHoraRealChegada: null,
         },
-        
-        // Cliente
+
+        // CLIENTE SELECCIONADO DA BASE DE DADOS
         cliente: {
-          clienteId: data.clienteId,
+          clienteId: cliente.clienteId || cliente.utilizadorId || data.clienteId,
           nome: cliente.nome,
           email: cliente.email || '',
           telefone: cliente.telefone || '',
           nif: cliente.nif || '',
           endereco: cliente.endereco || '',
         },
-        
-        // Transportador
+
+        // TRANSPORTADOR
         transportador: {
           transportadorId: transportador.transportadorId,
           nome: transportador.nome || '',
@@ -335,8 +498,8 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
           endereco: transportador.endereco || '',
           licenca: transportador.licenca || '',
         },
-        
-        // Motorista
+
+        // MOTORISTA
         motorista: {
           motoristaId: motorista._id,
           nome: motorista.nome,
@@ -348,8 +511,8 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
           validadeCarta: motorista.validadeCarta || undefined,
           foto: '',
         },
-        
-        // Viatura
+
+        // VIATURA
         viatura: {
           matricula: data.viaturaMatricula,
           marca: data.viaturaMarca || '',
@@ -359,23 +522,23 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
           capacidadeCarga: data.viaturaCapacidadeCarga || null,
           tipoViatura: data.viaturaTipoViatura || 'camião',
         },
-        
-        // Contentor
+
+        // CONTENTOR
         contentor: {
           numeroContentor: '',
           tipoContentor: '20_pes',
           selo: '',
           estadoContentor: 'vazio',
         },
-        
-        // Reboque
+
+        // REBOQUE
         reboque: {
           matricula: '',
           tipo: '',
           capacidade: null,
         },
-        
-        // Rota
+
+        // ROTA
         rota: {
           pontosPassagem: [],
           coordenadasRota: [],
@@ -383,12 +546,12 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
           rotaOtimizada: false,
           rotaAlternativa: [],
         },
-        
-        // Etapas e Status
+
+        // ETAPAS E ESTADO
         etapas: [],
         status: 'registada',
-        
-        // LOCALIZAÇÃO ATUAL
+
+        // LOCALIZAÇÃO ACTUAL
         localizacaoAtual: {
           latitude: -25.969248,
           longitude: 32.573174,
@@ -402,7 +565,7 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
           dataHora: new Date().toISOString(),
           fonte: 'manual',
         },
-        
+
         historicoLocalizacoes: [],
         alertas: [],
         ocorrencias: [],
@@ -412,8 +575,8 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
         mensagens: [],
         notificacoes: [],
         relatorios: [],
-        
-        // Métricas
+
+        // MÉTRICAS
         metricas: {
           distanciaPercorridaKm: 0,
           tempoTotalViagemHoras: 0,
@@ -423,8 +586,8 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
           custoTotal: null,
           eficiencia: null,
         },
-        
-        // Controle de Qualidade
+
+        // CONTROLO DE QUALIDADE
         controleQualidade: {
           inspecaoInicial: {
             realizada: false,
@@ -433,6 +596,7 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
             resultado: 'aprovado',
             observacoes: '',
           },
+
           inspecaoFinal: {
             realizada: false,
             dataHora: new Date().toISOString(),
@@ -440,127 +604,190 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
             resultado: 'aprovado',
             observacoes: '',
           },
+
           checklist: [],
         },
-        
+
         pagamentos: [],
         observacoes: '',
         prioridade: 'media',
         tags: [],
       };
 
-      console.log('📦 Enviando payload com codigoRastreio:', JSON.stringify(payload, null, 2));
+      console.log(
+        'A enviar carga:',
+        JSON.stringify(payload, null, 2)
+      );
 
       const response = await cargaApi.create(payload);
 
-      console.log('📦 Resposta:', response);
+      console.log('Resposta da criação da carga:', response);
 
-      if (response.returnCode === 200 || response.returnCode === 201) {
+      if (
+        response.returnCode === 200 ||
+        response.returnCode === 201
+      ) {
         if (onSuccess) {
           onSuccess(response.data.cargaId);
         } else {
           router.push(`/cargas/${response.data.cargaId}`);
         }
       } else {
-        setError(response.returnMsg || 'Erro ao criar carga');
+        throw new Error(
+          response.returnMsg || 'Erro ao criar carga.'
+        );
       }
+
     } catch (err: any) {
-      console.error('❌ Erro ao criar carga:', err);
-      
-      let errorMsg = err.message || 'Erro ao criar carga';
-      if (err.response?.data?.returnMsg) {
-        errorMsg = err.response.data.returnMsg;
-      } else if (err.response?.data?.message) {
-        errorMsg = err.response.data.message;
-      }
-      
+      console.error('Erro ao criar carga:', err);
+
+      const errorMsg =
+        err.response?.data?.returnMsg ||
+        err.response?.data?.mensagem ||
+        err.response?.data?.message ||
+        err.message ||
+        'Erro ao criar carga.';
+
       setError(errorMsg);
+
     } finally {
       setLoading(false);
     }
   };
 
-  if (loadingData) {
+  // ============================================================
+  // CARREGAMENTO INICIAL DOS MOTORISTAS
+  // ============================================================
+
+  if (loadingMotoristas) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex min-h-[400px] items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-gray-400 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="mt-4 text-gray-500">Carregando dados...</p>
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-gray-400 border-t-transparent" />
+          <p className="mt-4 text-gray-500">
+            A carregar dados...
+          </p>
         </div>
       </div>
     );
   }
 
+  // ============================================================
+  // INTERFACE DO FORMULÁRIO
+  // ============================================================
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="space-y-6"
+    >
+      {/* ERRO GERAL */}
       {error && (
-        <Alert variant="danger" dismissible onDismiss={() => setError(null)}>
+        <Alert
+          variant="danger"
+          dismissible
+          onDismiss={() => setError(null)}
+        >
           <div className="flex items-start gap-2">
-            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+
             <div>
-              <p className="font-medium">Erro ao criar carga</p>
+              <p className="font-medium">
+                Erro ao criar carga
+              </p>
+
               <p className="text-sm">{error}</p>
-              {(!hasClientes || !hasMotoristas) && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {!hasClientes && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push('/register?perfil=cliente&from=clientes')}
-                      className="border-gray-200 text-gray-600 hover:bg-gray-50"
-                    >
-                      Cadastrar Cliente
-                    </Button>
-                  )}
-                  {!hasMotoristas && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push('/register?perfil=motorista&from=motoristas')}
-                      className="border-gray-200 text-gray-600 hover:bg-gray-50"
-                    >
-                      Cadastrar Motorista
-                    </Button>
-                  )}
+
+              <div className="mt-2 flex flex-wrap gap-2">
+                {!hasClientes && !loadingClientes && (
                   <Button
-                    variant="ghost"
+                    type="button"
+                    variant="outline"
                     size="sm"
-                    onClick={fetchData}
-                    leftIcon={<RefreshCw className="w-4 h-4" />}
-                    className="text-gray-500 hover:text-gray-700"
+                    onClick={() =>
+                      router.push('/register?perfil=cliente&from=clientes')
+                    }
+                    className="border-gray-200 text-gray-600 hover:bg-gray-50"
                   >
-                    Recarregar
+                    Cadastrar Cliente
                   </Button>
-                </div>
-              )}
+                )}
+
+                {!hasMotoristas && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      router.push('/register?perfil=motorista&from=motoristas')
+                    }
+                    className="border-gray-200 text-gray-600 hover:bg-gray-50"
+                  >
+                    Cadastrar Motorista
+                  </Button>
+                )}
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    fetchData();
+                    window.location.reload();
+                  }}
+                  leftIcon={<RefreshCw className="h-4 w-4" />}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  Recarregar
+                </Button>
+              </div>
             </div>
           </div>
         </Alert>
       )}
 
+      {/* ERRO DOS MOTORISTAS */}
       {dataError && !error && (
         <Alert variant="warning" dismissible>
           {dataError}
         </Alert>
       )}
 
+      {/* ERRO DOS CLIENTES */}
+      {clienteError && (
+        <Alert variant="warning" dismissible>
+          <div className="space-y-1">
+            <p className="font-medium">
+              Não foi possível carregar os clientes
+            </p>
+            <p className="text-sm">{clienteError}</p>
+          </div>
+        </Alert>
+      )}
+
+      {/* ERRO DOS TRANSPORTADORES */}
       {transportadorError && (
         <Alert variant="warning" dismissible>
           <div className="space-y-1">
-            <p className="font-medium">Não foi possível carregar os transportadores</p>
+            <p className="font-medium">
+              Não foi possível carregar os transportadores
+            </p>
             <p className="text-sm">{transportadorError}</p>
           </div>
         </Alert>
       )}
 
-      {/* Informações da Carga */}
+      {/* ======================================================
+          INFORMAÇÕES DA CARGA
+      ====================================================== */}
+
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-700 border-b border-gray-100 pb-2 flex items-center gap-2">
-          <Package className="w-4 h-4 text-gray-500" />
+        <h3 className="flex items-center gap-2 border-b border-gray-100 pb-2 text-sm font-medium text-gray-700">
+          <Package className="h-4 w-4 text-gray-500" />
           Informações da Carga
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Input
             label="Descrição *"
             placeholder="Descreva a carga"
@@ -578,13 +805,13 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Input
             label="Peso (kg) *"
             type="number"
             step="0.1"
             placeholder="0.0"
-            leftIcon={<Weight className="w-4 h-4 text-gray-400" />}
+            leftIcon={<Weight className="h-4 w-4 text-gray-400" />}
             {...register('peso', { valueAsNumber: true })}
             error={errors.peso?.message}
             className="bg-gray-50 border-gray-200 focus:bg-white text-gray-700 placeholder:text-gray-400"
@@ -595,7 +822,7 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
             type="number"
             step="0.1"
             placeholder="0.0"
-            leftIcon={<Ruler className="w-4 h-4 text-gray-400" />}
+            leftIcon={<Ruler className="h-4 w-4 text-gray-400" />}
             {...register('volume', { valueAsNumber: true })}
             error={errors.volume?.message}
             className="bg-gray-50 border-gray-200 focus:bg-white text-gray-700 placeholder:text-gray-400"
@@ -606,7 +833,7 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
             type="number"
             step="0.01"
             placeholder="0.00"
-            leftIcon={<DollarSign className="w-4 h-4 text-gray-400" />}
+            leftIcon={<DollarSign className="h-4 w-4 text-gray-400" />}
             {...register('valorDeclarado', { valueAsNumber: true })}
             error={errors.valorDeclarado?.message}
             className="bg-gray-50 border-gray-200 focus:bg-white text-gray-700 placeholder:text-gray-400"
@@ -614,14 +841,17 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
         </div>
       </div>
 
-      {/* Origem */}
+      {/* ======================================================
+          ORIGEM
+      ====================================================== */}
+
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-700 border-b border-gray-100 pb-2 flex items-center gap-2">
-          <MapPin className="w-4 h-4 text-gray-500" />
+        <h3 className="flex items-center gap-2 border-b border-gray-100 pb-2 text-sm font-medium text-gray-700">
+          <MapPin className="h-4 w-4 text-gray-500" />
           Origem
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Input
             label="Endereço *"
             placeholder="Rua, número, bairro"
@@ -648,14 +878,17 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
         </div>
       </div>
 
-      {/* Destino */}
+      {/* ======================================================
+          DESTINO
+      ====================================================== */}
+
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-700 border-b border-gray-100 pb-2 flex items-center gap-2">
-          <Map className="w-4 h-4 text-gray-500" />
+        <h3 className="flex items-center gap-2 border-b border-gray-100 pb-2 text-sm font-medium text-gray-700">
+          <Map className="h-4 w-4 text-gray-500" />
           Destino
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Input
             label="Endereço *"
             placeholder="Rua, número, bairro"
@@ -682,58 +915,129 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
         </div>
       </div>
 
-      {/* Cliente */}
+      {/* ======================================================
+          CLIENTE - DADOS REAIS DA BASE DE DADOS
+      ====================================================== */}
+
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-700 border-b border-gray-100 pb-2 flex items-center gap-2">
-          <User className="w-4 h-4 text-gray-500" />
+        <h3 className="flex items-center gap-2 border-b border-gray-100 pb-2 text-sm font-medium text-gray-700">
+          <User className="h-4 w-4 text-gray-500" />
           Cliente
         </h3>
 
         <div className="grid grid-cols-1 gap-4">
           <AutocompleteSelect
-            label="Selecione o Cliente *"
+            label="Seleccione o Cliente *"
             options={clienteOptions}
             value={watch('clienteId') || ''}
-            onChange={(value) => setValue('clienteId', value)}
-            placeholder="Buscar cliente por nome ou email..."
+            onChange={(value) =>
+              setValue('clienteId', value, {
+                shouldValidate: true,
+                shouldDirty: true,
+              })
+            }
+            placeholder="Buscar cliente por nome, e-mail ou telefone..."
             error={errors.clienteId?.message}
-            loading={loadingData}
-            disabled={!hasClientes}
+            loading={loadingClientes}
+            disabled={loadingClientes || !hasClientes}
             required
-            noOptionsMessage={!hasClientes ? 'Nenhum cliente cadastrado. Cadastre um cliente primeiro.' : 'Nenhum cliente encontrado'}
+            noOptionsMessage={
+              loadingClientes
+                ? 'A carregar clientes...'
+                : !hasClientes
+                  ? 'Nenhum cliente activo encontrado na base de dados.'
+                  : 'Nenhum cliente encontrado.'
+            }
           />
-          
-          {!hasClientes && (
+
+          {loadingClientes && (
+            <p className="text-xs text-gray-500">
+              A carregar clientes da base de dados...
+            </p>
+          )}
+
+          {!loadingClientes && hasClientes && (
+            <p className="text-xs text-gray-500">
+              {clientes.length} cliente(s) activo(s) disponível(is).
+            </p>
+          )}
+
+          {!loadingClientes && !hasClientes && (
             <Button
+              type="button"
               variant="outline"
               size="sm"
-              onClick={() => router.push('/register?perfil=cliente&from=clientes')}
-              className="border-gray-200 text-gray-600 hover:bg-gray-50 w-fit"
+              onClick={() =>
+                router.push('/register?perfil=cliente&from=clientes')
+              }
+              className="w-fit border-gray-200 text-gray-600 hover:bg-gray-50"
             >
               Cadastrar Novo Cliente
             </Button>
           )}
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={async () => {
+              setLoadingClientes(true);
+              setClienteError(null);
+
+              try {
+                const response = await clienteApi.getList({
+                  curPage: 1,
+                  pageSize: 1000,
+                  ativo: true,
+                });
+
+                setClientes(
+                  response.data.list.filter(
+                    (c) =>
+                      c.ativo === true &&
+                      (!c.estadoConta || c.estadoConta === 'ativo')
+                  )
+                );
+              } catch (err: any) {
+                setClienteError(
+                  err.message || 'Erro ao recarregar clientes.'
+                );
+              } finally {
+                setLoadingClientes(false);
+              }
+            }}
+            leftIcon={<RefreshCw className="h-4 w-4" />}
+            className="w-fit text-gray-500 hover:text-gray-700"
+          >
+            Actualizar lista de clientes
+          </Button>
         </div>
       </div>
 
-      {/* Transportador */}
+      {/* ======================================================
+          TRANSPORTADOR
+      ====================================================== */}
+
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-700 border-b border-gray-100 pb-2 flex items-center gap-2">
-          <Building className="w-4 h-4 text-gray-500" />
+        <h3 className="flex items-center gap-2 border-b border-gray-100 pb-2 text-sm font-medium text-gray-700">
+          <Building className="h-4 w-4 text-gray-500" />
           Transportador
         </h3>
 
         <div className="grid grid-cols-1 gap-4">
           <Select
-            label="Selecione o Transportador *"
+            label="Seleccione o Transportador *"
             options={transportadorOptions}
             {...register('transportadorId')}
             error={
               errors.transportadorId?.message ||
-              (transportadorError ? 'Erro ao carregar transportadores' : undefined)
+              (transportadorError
+                ? 'Erro ao carregar transportadores'
+                : undefined)
             }
             className="bg-gray-50 border-gray-200 focus:bg-white text-gray-700"
           />
+
           <p className="text-xs text-gray-500">
             {loadingTransportadores
               ? 'A carregar transportadores...'
@@ -744,33 +1048,48 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
         </div>
       </div>
 
-      {/* Motorista */}
+      {/* ======================================================
+          MOTORISTA
+      ====================================================== */}
+
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-700 border-b border-gray-100 pb-2 flex items-center gap-2">
-          <User className="w-4 h-4 text-gray-500" />
+        <h3 className="flex items-center gap-2 border-b border-gray-100 pb-2 text-sm font-medium text-gray-700">
+          <User className="h-4 w-4 text-gray-500" />
           Motorista
         </h3>
 
         <div className="grid grid-cols-1 gap-4">
           <AutocompleteSelect
-            label="Selecione o Motorista *"
+            label="Seleccione o Motorista *"
             options={motoristaOptions}
             value={watch('motoristaId') || ''}
-            onChange={(value) => setValue('motoristaId', value)}
+            onChange={(value) =>
+              setValue('motoristaId', value, {
+                shouldValidate: true,
+                shouldDirty: true,
+              })
+            }
             placeholder="Buscar motorista por nome ou telefone..."
             error={errors.motoristaId?.message}
-            loading={loadingData}
+            loading={loadingMotoristas}
             disabled={!hasMotoristas}
             required
-            noOptionsMessage={!hasMotoristas ? 'Nenhum motorista cadastrado. Cadastre um motorista primeiro.' : 'Nenhum motorista encontrado'}
+            noOptionsMessage={
+              !hasMotoristas
+                ? 'Nenhum motorista cadastrado. Cadastre um motorista primeiro.'
+                : 'Nenhum motorista encontrado.'
+            }
           />
-          
+
           {!hasMotoristas && (
             <Button
+              type="button"
               variant="outline"
               size="sm"
-              onClick={() => router.push('/register?perfil=motorista&from=motoristas')}
-              className="border-gray-200 text-gray-600 hover:bg-gray-50 w-fit"
+              onClick={() =>
+                router.push('/register?perfil=motorista&from=motoristas')
+              }
+              className="w-fit border-gray-200 text-gray-600 hover:bg-gray-50"
             >
               Cadastrar Novo Motorista
             </Button>
@@ -778,14 +1097,17 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
         </div>
       </div>
 
-      {/* Viatura */}
+      {/* ======================================================
+          VIATURA
+      ====================================================== */}
+
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-700 border-b border-gray-100 pb-2 flex items-center gap-2">
-          <Truck className="w-4 h-4 text-gray-500" />
+        <h3 className="flex items-center gap-2 border-b border-gray-100 pb-2 text-sm font-medium text-gray-700">
+          <Truck className="h-4 w-4 text-gray-500" />
           Viatura
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Input
             label="Matrícula *"
             placeholder="Ex: AB-12-34-CD"
@@ -809,7 +1131,7 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           <Input
             label="Ano"
             type="number"
@@ -829,7 +1151,9 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
             label="Capacidade Carga (kg)"
             type="number"
             placeholder="5000"
-            {...register('viaturaCapacidadeCarga', { valueAsNumber: true })}
+            {...register('viaturaCapacidadeCarga', {
+              valueAsNumber: true,
+            })}
             className="bg-gray-50 border-gray-200 focus:bg-white text-gray-700 placeholder:text-gray-400"
           />
 
@@ -842,8 +1166,11 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
         </div>
       </div>
 
-      {/* Botões */}
-      <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-100">
+      {/* ======================================================
+          BOTÕES
+      ====================================================== */}
+
+      <div className="flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row">
         <Button
           type="submit"
           variant="primary"
@@ -852,16 +1179,17 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
           disabled={
             !hasClientes ||
             !hasMotoristas ||
-            loadingData ||
+            loadingClientes ||
+            loadingMotoristas ||
             loadingTransportadores ||
             transportadores.length === 0
           }
           fullWidth
-          className="bg-gray-800 hover:bg-gray-900 text-white focus:ring-gray-500 disabled:opacity-50"
+          className="bg-gray-800 text-white hover:bg-gray-900 focus:ring-gray-500 disabled:opacity-50"
         >
-          {loading ? 'Criando...' : 'Criar Carga'}
+          {loading ? 'A criar...' : 'Criar Carga'}
         </Button>
-        
+
         <Button
           type="button"
           variant="outline"
@@ -873,10 +1201,22 @@ export const CargaForm: React.FC<CargaFormProps> = ({ onSuccess }) => {
         </Button>
       </div>
 
-      <div className="text-xs text-gray-400 flex justify-between border-t border-gray-100 pt-4">
-        <span>Clientes: {clientes.length} registados</span>
-        <span>Motoristas: {motoristas.length} registados</span>
-        <span>Transportadores: {transportadores.length} activos</span>
+      {/* ======================================================
+          RESUMO DOS REGISTOS
+      ====================================================== */}
+
+      <div className="flex flex-wrap justify-between gap-2 border-t border-gray-100 pt-4 text-xs text-gray-400">
+        <span>
+          Clientes: {clientes.length} registados
+        </span>
+
+        <span>
+          Motoristas: {motoristas.length} registados
+        </span>
+
+        <span>
+          Transportadores: {transportadores.length} activos
+        </span>
       </div>
     </form>
   );

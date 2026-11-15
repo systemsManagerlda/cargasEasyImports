@@ -1,19 +1,23 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { apiClient } from './client';
-import { API_ENDPOINTS } from './endpoints';
+
+import { apiClient } from "./client";
 
 export interface Cliente {
+  _id?: string;
   clienteId: string;
+  utilizadorId?: string;
   nome: string;
   email: string;
   telefone: string;
+  telefoneAlternativo?: string;
   nif: string;
   endereco: string;
   cidade: string;
   provincia: string;
   pais: string;
   ativo: boolean;
+  estadoConta?: string;
+  observacoes?: string;
   dataCriacao: string;
 }
 
@@ -28,290 +32,289 @@ export interface ClienteListParams {
   orderDirection?: number;
 }
 
-// Dados mockados para fallback
-const MOCK_CLIENTES: Cliente[] = [
-  {
-    clienteId: 'CLI-001',
-    nome: 'Empresa ABC Lda',
-    email: 'contato@abc.co.mz',
-    telefone: '+258 84 123 4567',
-    nif: '123456789',
-    endereco: 'Av. Eduardo Mondlane, 123',
-    cidade: 'Maputo',
-    provincia: 'Maputo',
-    pais: 'Moçambique',
-    ativo: true,
-    dataCriacao: new Date().toISOString(),
-  },
-  {
-    clienteId: 'CLI-002',
-    nome: 'Comercial XYZ',
-    email: 'info@xyz.co.mz',
-    telefone: '+258 82 987 6543',
-    nif: '987654321',
-    endereco: 'Rua das Flores, 45',
-    cidade: 'Beira',
-    provincia: 'Sofala',
-    pais: 'Moçambique',
-    ativo: true,
-    dataCriacao: new Date().toISOString(),
-  },
-  {
-    clienteId: 'CLI-003',
-    nome: 'Distribuidora Nacional',
-    email: 'distribuicao@dn.co.mz',
-    telefone: '+258 86 456 7890',
-    nif: '456789123',
-    endereco: 'Estrada Nacional, Km 10',
-    cidade: 'Nampula',
-    provincia: 'Nampula',
-    pais: 'Moçambique',
-    ativo: true,
-    dataCriacao: new Date().toISOString(),
-  },
-];
+export interface ClienteListResponse {
+  returnCode: number;
+  returnMsg: string;
+  data: {
+    list: Cliente[];
+    totalCount: number;
+    totalPage: number;
+    curPage: number;
+    pageSize: number;
+  };
+}
+
+// Normalizar respostas da API
+const getBody = (response: any) => {
+  return response?.data?.returnCode !== undefined
+    ? response.data
+    : response;
+};
+
+// Normalizar dados provenientes do UtilizadorSchema
+const normalizarCliente = (item: any): Cliente => {
+  const endereco = item.endereco || {};
+
+  const documentoNif = item.documentosIdentificacao?.find(
+    (doc: any) => doc.tipo === "nif"
+  );
+
+  return {
+    _id: item._id,
+    clienteId: item.clienteId || item.utilizadorId || "",
+    utilizadorId: item.utilizadorId || "",
+    nome: item.nome || item.nomeCompleto || "",
+    email: item.email || "",
+    telefone: item.telefone || "",
+    telefoneAlternativo: item.telefoneAlternativo || "",
+    nif: item.nif || documentoNif?.numero || "",
+    endereco:
+      typeof endereco === "object"
+        ? endereco.rua || ""
+        : endereco,
+    cidade:
+      typeof endereco === "object"
+        ? endereco.cidade || ""
+        : item.cidade || "",
+    provincia:
+      typeof endereco === "object"
+        ? endereco.provincia || ""
+        : item.provincia || "",
+    pais:
+      typeof endereco === "object"
+        ? endereco.pais || "Moçambique"
+        : item.pais || "Moçambique",
+    ativo: Boolean(item.ativo),
+    estadoConta: item.estadoConta || "",
+    observacoes: item.observacoes || "",
+    dataCriacao: item.dataCriacao || item.createdAt || "",
+  };
+};
 
 export const clienteApi = {
-  async getList(params: ClienteListParams = {}): Promise<{
-    returnCode: number;
-    returnMsg: string;
-    data: { list: Cliente[]; totalCount: number; totalPage: number; curPage: number; pageSize: number };
-  }> {
-    try {
-      const response = await apiClient.post<any>(API_ENDPOINTS.CARGAS, {
-        curPage: 1,
-        pageSize: 1000,
-        search: params.search,
-      });
+  // ============================================================
+  // LISTAR CLIENTES DA BASE DE DADOS
+  // ============================================================
 
-      if (response.returnCode === 200) {
-        const cargas = response.data?.list || [];
-        const clientesMap = new Map<string, Cliente>();
-        
-        cargas.forEach((carga: any) => {
-          if (carga.cliente && carga.cliente.clienteId) {
-            const c = carga.cliente;
-            if (!clientesMap.has(c.clienteId)) {
-              clientesMap.set(c.clienteId, {
-                clienteId: c.clienteId,
-                nome: c.nome || 'Cliente sem nome',
-                email: c.email || '',
-                telefone: c.telefone || '',
-                nif: c.nif || '',
-                endereco: c.endereco || '',
-                cidade: carga.origem?.cidade || '',
-                provincia: '',
-                pais: carga.origem?.pais || 'Moçambique',
-                ativo: true,
-                dataCriacao: carga.dataCriacao || new Date().toISOString(),
-              });
-            }
-          }
-        });
-
-        let clientes = Array.from(clientesMap.values());
-        
-        if (params.search) {
-          const search = params.search.toLowerCase();
-          clientes = clientes.filter(c => 
-            c.nome.toLowerCase().includes(search) ||
-            c.email.toLowerCase().includes(search) ||
-            c.telefone.includes(search)
-          );
-        }
-        if (params.cidade) {
-          clientes = clientes.filter(c => c.cidade === params.cidade);
-        }
-
-        if (clientes.length === 0) {
-          clientes = MOCK_CLIENTES;
-        }
-
-        const start = ((params.curPage || 1) - 1) * (params.pageSize || 10);
-        const end = start + (params.pageSize || 10);
-        const paginated = clientes.slice(start, end);
-
-        return {
-          returnCode: 200,
-          returnMsg: 'Success',
-          data: {
-            list: paginated,
-            totalCount: clientes.length,
-            totalPage: Math.ceil(clientes.length / (params.pageSize || 10)),
-            curPage: params.curPage || 1,
-            pageSize: params.pageSize || 10,
-          }
-        };
+  async getList(
+    params: ClienteListParams = {}
+  ): Promise<ClienteListResponse> {
+    const response = await apiClient.post<any>(
+      "/getClienteListA",
+      {
+        curPage: params.curPage || 1,
+        pageSize: params.pageSize || 10,
+        search: params.search || "",
+        ativo: params.ativo,
+        cidade: params.cidade || "",
+        provincia: params.provincia || "",
+        orderBy: params.orderBy || "dataCriacao",
+        orderDirection: params.orderDirection ?? -1,
       }
+    );
 
-      return {
-        returnCode: 200,
-        returnMsg: 'Success (mock)',
-        data: {
-          list: MOCK_CLIENTES,
-          totalCount: MOCK_CLIENTES.length,
-          totalPage: 1,
-          curPage: 1,
-          pageSize: 10,
-        }
-      };
+    const body = getBody(response);
 
-    } catch (error) {
-      console.warn('⚠️ Erro ao buscar clientes, usando dados mockados');
-      return {
-        returnCode: 200,
-        returnMsg: 'Success (mock)',
-        data: {
-          list: MOCK_CLIENTES,
-          totalCount: MOCK_CLIENTES.length,
-          totalPage: 1,
-          curPage: 1,
-          pageSize: 10,
-        }
-      };
+    if (
+      body?.returnCode !== undefined &&
+      body.returnCode !== 200
+    ) {
+      throw new Error(
+        body.returnMsg || "Erro ao carregar clientes."
+      );
     }
+
+    if (body?.sucesso === false) {
+      throw new Error(
+        body.mensagem || "Erro ao carregar clientes."
+      );
+    }
+
+    const dados = body?.data || {};
+
+    const lista = Array.isArray(dados)
+      ? dados
+      : dados.list || [];
+
+    return {
+      returnCode: 200,
+      returnMsg: body.returnMsg || body.mensagem || "Sucesso",
+      data: {
+        list: lista.map(normalizarCliente),
+        totalCount: Number(dados.totalCount ?? lista.length),
+        totalPage: Number(dados.totalPage ?? 1),
+        curPage: Number(dados.curPage ?? params.curPage ?? 1),
+        pageSize: Number(dados.pageSize ?? params.pageSize ?? 10),
+      },
+    };
   },
 
-  async create(data: any): Promise<{ returnCode: number; returnMsg: string; data: Cliente }> {
-    try {
-      const response = await apiClient.post<any>(API_ENDPOINTS.REGISTER, {
-        ...data,
-        perfil: 'cliente',
-      });
-      
-      if (response.returnCode === 200 || response.returnCode === 201) {
-        return {
-          returnCode: response.returnCode,
-          returnMsg: response.returnMsg || 'Cliente criado com sucesso',
-          data: {
-            clienteId: response.data?.utilizadorId || `CLI-${Date.now()}`,
-            nome: data.nomeCompleto || data.nome || '',
-            email: data.email || '',
-            telefone: data.telefone || '',
-            nif: data.nif || '',
-            endereco: data.endereco || '',
-            cidade: data.cidade || '',
-            provincia: data.provincia || '',
-            pais: data.pais || 'Moçambique',
-            ativo: true,
-            dataCriacao: new Date().toISOString(),
-          }
-        };
-      }
-      
-      throw new Error(response.returnMsg || 'Erro ao criar cliente');
-    } catch (error) {
-      const novoCliente: Cliente = {
-        clienteId: `CLI-${Date.now()}`,
-        nome: data.nomeCompleto || data.nome || 'Novo Cliente',
-        email: data.email || '',
-        telefone: data.telefone || '',
-        nif: data.nif || '',
-        endereco: data.endereco || '',
-        cidade: data.cidade || '',
-        provincia: data.provincia || '',
-        pais: data.pais || 'Moçambique',
-        ativo: true,
-        dataCriacao: new Date().toISOString(),
-      };
-      
-      return {
-        returnCode: 201,
-        returnMsg: 'Cliente criado localmente',
-        data: novoCliente,
-      };
-    }
-  },
+  // ============================================================
+  // CONSULTAR DETALHES DO CLIENTE
+  // ============================================================
 
-  async getDetail(clienteId: string): Promise<{ returnCode: number; returnMsg: string; data: Cliente }> {
-    try {
-      const response = await apiClient.post<any>(API_ENDPOINTS.CARGAS_BY_CLIENTE, {
-        clienteId,
-        limit: 1,
-      });
-
-      if (response.returnCode === 200 && response.data && response.data.length > 0) {
-        const carga = response.data[0];
-        return {
-          returnCode: 200,
-          returnMsg: 'Success',
-          data: {
-            clienteId: carga.cliente.clienteId,
-            nome: carga.cliente.nome,
-            email: carga.cliente.email || '',
-            telefone: carga.cliente.telefone || '',
-            nif: carga.cliente.nif || '',
-            endereco: carga.cliente.endereco || '',
-            cidade: carga.origem?.cidade || '',
-            provincia: '',
-            pais: carga.origem?.pais || 'Moçambique',
-            ativo: true,
-            dataCriacao: carga.dataCriacao || new Date().toISOString(),
-          }
-        };
-      }
-
-      const mock = MOCK_CLIENTES.find(c => c.clienteId === clienteId);
-      if (mock) {
-        return {
-          returnCode: 200,
-          returnMsg: 'Success (mock)',
-          data: mock,
-        };
-      }
-
-      return {
-        returnCode: 404,
-        returnMsg: 'Cliente não encontrado',
-        data: {} as Cliente,
-      };
-    } catch (error) {
-      const mock = MOCK_CLIENTES.find(c => c.clienteId === clienteId);
-      if (mock) {
-        return {
-          returnCode: 200,
-          returnMsg: 'Success (mock)',
-          data: mock,
-        };
-      }
-      return {
-        returnCode: 404,
-        returnMsg: 'Cliente não encontrado',
-        data: {} as Cliente,
-      };
-    }
-  },
-
-  async update(clienteId: string, data: Partial<Cliente>): Promise<{
+  async getDetail(
+    clienteId: string
+  ): Promise<{
     returnCode: number;
     returnMsg: string;
     data: Cliente;
   }> {
-    return {
-      returnCode: 501,
-      returnMsg: 'Funcionalidade não implementada para este endpoint',
-      data: {} as Cliente,
-    };
-  },
+    const response = await apiClient.post<any>(
+      "/getClienteDetailA",
+      { clienteId }
+    );
 
-  async delete(clienteId: string): Promise<{ returnCode: number; returnMsg: string }> {
-    return {
-      returnCode: 501,
-      returnMsg: 'Funcionalidade não implementada para este endpoint',
-    };
-  },
+    const body = getBody(response);
 
-  async getStats(): Promise<{ returnCode: number; returnMsg: string; data: { total: number; ativos: number; inativos: number } }> {
-    const response = await this.getList({ pageSize: 1000 });
-    const clientes = response.data?.list || [];
+    if (
+      body?.returnCode !== undefined &&
+      body.returnCode !== 200
+    ) {
+      throw new Error(
+        body.returnMsg || "Cliente não encontrado."
+      );
+    }
+
+    if (body?.sucesso === false) {
+      throw new Error(
+        body.mensagem || "Cliente não encontrado."
+      );
+    }
+
+    const cliente = body?.data || body?.cliente;
+
+    if (!cliente) {
+      throw new Error("Cliente não encontrado.");
+    }
+
     return {
       returnCode: 200,
-      returnMsg: 'Success',
-      data: {
-        total: clientes.length,
-        ativos: clientes.filter(c => c.ativo).length,
-        inativos: clientes.filter(c => !c.ativo).length,
+      returnMsg: "Cliente encontrado.",
+      data: normalizarCliente(cliente),
+    };
+  },
+
+  // ============================================================
+  // CRIAR CLIENTE
+  // ============================================================
+
+  async create(data: any): Promise<{
+    returnCode: number;
+    returnMsg: string;
+    data: Cliente;
+  }> {
+    const response = await apiClient.post<any>(
+      "/register",
+      {
+        ...data,
+        perfil: "cliente",
       }
+    );
+
+    const body = getBody(response);
+
+    if (
+      body?.returnCode !== 200 &&
+      body?.returnCode !== 201
+    ) {
+      throw new Error(
+        body?.returnMsg ||
+        body?.mensagem ||
+        "Erro ao criar cliente."
+      );
+    }
+
+    return {
+      returnCode: body.returnCode,
+      returnMsg: body.returnMsg || body.mensagem || "Cliente criado com sucesso.",
+      data: normalizarCliente(body.data || body.utilizador || {}),
+    };
+  },
+
+  // ============================================================
+  // ACTUALIZAR CLIENTE
+  // ============================================================
+
+  async update(
+    clienteId: string,
+    data: Partial<Cliente>
+  ): Promise<{
+    returnCode: number;
+    returnMsg: string;
+    data: Cliente;
+  }> {
+    const response = await apiClient.post<any>(
+      "/updateClienteA",
+      {
+        ...data,
+        clienteId,
+      }
+    );
+
+    const body = getBody(response);
+
+    if (
+      body?.returnCode !== undefined &&
+      body.returnCode !== 200
+    ) {
+      throw new Error(
+        body.returnMsg || "Erro ao actualizar cliente."
+      );
+    }
+
+    if (body?.sucesso === false) {
+      throw new Error(
+        body.mensagem || "Erro ao actualizar cliente."
+      );
+    }
+
+    const cliente = body?.data || body?.cliente;
+
+    return {
+      returnCode: 200,
+      returnMsg:
+        body.returnMsg ||
+        body.mensagem ||
+        "Cliente actualizado com sucesso.",
+      data: cliente
+        ? normalizarCliente(cliente)
+        : ({} as Cliente),
+    };
+  },
+
+  // ============================================================
+  // ESTATÍSTICAS
+  // ============================================================
+
+  async getStats(): Promise<{
+    returnCode: number;
+    returnMsg: string;
+    data: {
+      total: number;
+      ativos: number;
+      inativos: number;
+    };
+  }> {
+    const response = await this.getList({
+      curPage: 1,
+      pageSize: 1000,
+    });
+
+    const clientes = response.data.list;
+
+    return {
+      returnCode: 200,
+      returnMsg: "Sucesso",
+      data: {
+        total: response.data.totalCount,
+        ativos: clientes.filter(
+          (c) => c.ativo && c.estadoConta === "ativo"
+        ).length,
+        inativos: clientes.filter(
+          (c) => !c.ativo || c.estadoConta !== "ativo"
+        ).length,
+      },
     };
   },
 };

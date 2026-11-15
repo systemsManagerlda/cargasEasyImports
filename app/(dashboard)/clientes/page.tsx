@@ -1,557 +1,876 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// app/(dashboard)/clientes/page.tsx
-'use client'
+"use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import { ProtectedRoute } from '@/components/common/ProtectedRoute';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { Card, CardBody } from '@/components/ui/Card';
-import { Spinner } from '@/components/ui/Spinner';
-import { Alert } from '@/components/ui/Alert';
-import { Pagination } from '@/components/ui/Pagination';
-import { clienteApi, Cliente } from '@/lib/api/clientes';
-import { 
-  Users, 
-  Search, 
-  X, 
-  RefreshCw, 
-  Plus,
-  SlidersHorizontal,
-  Phone,
-  Mail,
-  MapPin,
-  Building,
-  Eye,
-  Edit,
-  Trash2,
-  CheckCircle,
-  XCircle,
-  UserCircle,
-  UserPlus
-} from 'lucide-react';
-import Link from 'next/link';
-import { cn } from '@/lib/utils/cn';
+import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { ProtectedRoute } from "@/components/common/ProtectedRoute";
+import { apiClient } from "@/lib/api/client";
 
-const statusOptions = [
-  { value: '', label: 'Todos os status' },
-  { value: 'true', label: 'Ativo' },
-  { value: 'false', label: 'Inativo' },
-];
+type Cliente = {
+  _id?: string;
+  clienteId: string;
+  utilizadorId: string;
+  nome: string;
+  nomeUtilizador?: string;
+  email: string;
+  telefone: string;
+  telefoneAlternativo?: string;
+  nif?: string;
+  endereco?: string;
+  cidade?: string;
+  provincia?: string;
+  pais?: string;
+  estadoConta: string;
+  ativo: boolean;
+  observacoes?: string;
+};
 
-const provinciaOptions = [
-  { value: '', label: 'Todas as províncias' },
-  { value: 'Maputo', label: 'Maputo' },
-  { value: 'Maputo Província', label: 'Maputo Província' },
-  { value: 'Gaza', label: 'Gaza' },
-  { value: 'Inhambane', label: 'Inhambane' },
-  { value: 'Sofala', label: 'Sofala' },
-  { value: 'Manica', label: 'Manica' },
-  { value: 'Tete', label: 'Tete' },
-  { value: 'Zambézia', label: 'Zambézia' },
-  { value: 'Nampula', label: 'Nampula' },
-  { value: 'Cabo Delgado', label: 'Cabo Delgado' },
-  { value: 'Niassa', label: 'Niassa' },
-];
+type ApiResponse<T> = {
+  returnCode: number;
+  returnMsg?: string;
+  data: T;
+};
+
+type ListData = {
+  list: Cliente[];
+  totalCount: number;
+  totalPage: number;
+  curPage: number;
+  pageSize: number;
+};
+
+const emptyForm = {
+  nome: "",
+  email: "",
+  telefone: "",
+  telefoneAlternativo: "",
+  nif: "",
+  endereco: "",
+  cidade: "",
+  provincia: "",
+  pais: "Moçambique",
+  estadoConta: "ativo",
+  ativo: true,
+  observacoes: "",
+};
+
+const inputClass =
+  "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10";
+
+function initials(name?: string) {
+  return (name || "C")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
+function isActive(cliente: Cliente) {
+  return Boolean(cliente.ativo) && cliente.estadoConta === "ativo";
+}
 
 export default function ClientesPage() {
+  const [items, setItems] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [provinciaFilter, setProvinciaFilter] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  
-  // Ref para controlar se é o primeiro carregamento
-  const isFirstRender = useRef(true);
+  const [totalPages, setTotalPages] = useState(0);
+  const [selected, setSelected] = useState<Cliente | null>(null);
+  const [form, setForm] = useState({ ...emptyForm });
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
 
-  // Função para carregar clientes
-  const carregarClientes = async () => {
+  // ---------- CARREGAR CLIENTES ----------
+  const load = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setError("");
 
     try {
-      const params: any = {
-        curPage: currentPage,
-        pageSize: pageSize,
-      };
+      const response = await apiClient.post<ApiResponse<ListData>>(
+        "/getClienteListA",
+        {
+          curPage: page,
+          pageSize: 10,
+          search: search.trim(),
+          ativo:
+            status === "ativo"
+              ? true
+              : status === "inativo"
+                ? false
+                : undefined,
+        }
+      );
 
-      if (searchTerm) params.search = searchTerm;
-      if (statusFilter) params.ativo = statusFilter === 'true';
-      if (provinciaFilter) params.provincia = provinciaFilter;
+      const body: any =
+        response?.data?.returnCode !== undefined
+          ? response.data
+          : response;
 
-      console.log('📦 Carregando clientes com params:', params);
-
-      const response = await clienteApi.getList(params);
-
-      console.log('📦 Resposta da API:', response);
-
-      if (response.returnCode === 200) {
-        setClientes(response.data.list || []);
-        setTotal(response.data.totalCount || 0);
-        setTotalPages(response.data.totalPage || 1);
-      } else {
-        setError(response.returnMsg || 'Erro ao carregar clientes');
-        setClientes([]);
-        setTotal(0);
-        setTotalPages(1);
+      if (body.returnCode !== 200) {
+        throw new Error(
+          body.returnMsg || "Não foi possível carregar os clientes."
+        );
       }
-    } catch (err: any) {
-      console.error('❌ Erro ao carregar clientes:', err);
-      setError(err.message || 'Erro ao carregar clientes');
-      setClientes([]);
+
+      setItems(
+        Array.isArray(body.data?.list)
+          ? body.data.list
+          : []
+      );
+
+      setTotal(Number(body.data?.totalCount || 0));
+      setTotalPages(Number(body.data?.totalPage || 0));
+
+    } catch (e: any) {
+      setError(
+        e?.response?.data?.returnMsg ||
+        e?.message ||
+        "Erro ao carregar clientes."
+      );
+
+      setItems([]);
       setTotal(0);
-      setTotalPages(1);
+      setTotalPages(0);
+
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, search, status]);
 
-  // Carregar dados iniciais - apenas na montagem
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      carregarClientes();
+    void load();
+  }, [load]);
+
+  // ---------- CONSULTAR DETALHES ----------
+  const openDetail = async (item: Cliente) => {
+    setError("");
+    setNotice("");
+
+    try {
+      const response = await apiClient.post<ApiResponse<Cliente>>(
+        "/getClienteDetailA",
+        {
+          utilizadorId: item.utilizadorId,
+        }
+      );
+
+      const body: any =
+        response?.data?.returnCode !== undefined
+          ? response.data
+          : response;
+
+      if (body.returnCode !== 200) {
+        throw new Error(
+          body.returnMsg || "Erro ao consultar cliente."
+        );
+      }
+
+      const c: Cliente = body.data;
+
+      setSelected(c);
+
+      setForm({
+        nome: c.nome || "",
+        email: c.email || "",
+        telefone: c.telefone || "",
+        telefoneAlternativo: c.telefoneAlternativo || "",
+        nif: c.nif || "",
+        endereco: c.endereco || "",
+        cidade: c.cidade || "",
+        provincia: c.provincia || "",
+        pais: c.pais || "Moçambique",
+        estadoConta: c.estadoConta || "ativo",
+        ativo: Boolean(c.ativo),
+        observacoes: c.observacoes || "",
+      });
+
+    } catch (e: any) {
+      setError(
+        e?.response?.data?.returnMsg ||
+        e?.message ||
+        "Erro ao consultar cliente."
+      );
     }
-  }, []);
+  };
 
-  // Recarregar quando página ou filtros mudarem (exceto no primeiro load)
-  useEffect(() => {
-    if (!isFirstRender.current) {
-      carregarClientes();
+  // ---------- ACTUALIZAR CLIENTE ----------
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!selected) return;
+
+    setSaving(true);
+    setError("");
+    setNotice("");
+
+    try {
+      const response = await apiClient.post<ApiResponse<Cliente>>(
+        "/updateClienteA",
+        {
+          utilizadorId: selected.utilizadorId,
+
+          nomeCompleto: form.nome.trim(),
+          email: form.email.trim(),
+          telefone: form.telefone.trim(),
+          telefoneAlternativo: form.telefoneAlternativo.trim(),
+          nif: form.nif.trim(),
+
+          endereco: {
+            rua: form.endereco,
+            cidade: form.cidade,
+            provincia: form.provincia,
+            pais: form.pais,
+          },
+
+          estadoConta: form.estadoConta,
+          ativo: form.ativo,
+          observacoes: form.observacoes,
+        }
+      );
+
+      const body: any =
+        response?.data &&
+        typeof response.data === "object"
+          ? response.data
+          : response;
+
+      const sucesso =
+        body.returnCode === 200 ||
+        body.sucesso === true;
+
+      if (!sucesso) {
+        throw new Error(
+          body.returnMsg ||
+          body.mensagem ||
+          body.erro ||
+          "Não foi possível actualizar o cliente."
+        );
+      }
+
+      setNotice("Dados do cliente actualizados com sucesso.");
+      setSelected(null);
+
+      await load();
+
+    } catch (e: any) {
+      setError(
+        e?.response?.data?.returnMsg ||
+        e?.message ||
+        "Erro ao actualizar cliente."
+      );
+
+    } finally {
+      setSaving(false);
     }
-  }, [currentPage, pageSize, searchTerm, statusFilter, provinciaFilter]);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setCurrentPage(1);
   };
 
-  const handleClearFilters = () => {
-    setSearchTerm('');
-    setStatusFilter('');
-    setProvinciaFilter('');
-    setShowFilters(false);
-    setCurrentPage(1);
+  // ---------- ACTUALIZAR CAMPOS DO FORMULÁRIO ----------
+  const setField = (
+    key: keyof typeof emptyForm,
+    value: any
+  ) => {
+    setForm((old) => ({
+      ...old,
+      [key]: value,
+    }));
   };
 
-  const aplicarFiltros = () => {
-    setCurrentPage(1);
-  };
+  const activeCount = items.filter(isActive).length;
+  const inactiveCount = items.length - activeCount;
 
-  const handleRefresh = () => {
-    carregarClientes();
-  };
-
-  const goToPage = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  const changePageSize = (size: number) => {
-    setPageSize(size);
-    setCurrentPage(1);
-  };
-
-  // Mostrar loading
-  if (loading) {
-    return (
-      <ProtectedRoute>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <Spinner size="xl" />
-            <p className="mt-4 text-gray-500">Carregando clientes...</p>
-          </div>
-        </div>
-      </ProtectedRoute>
-    );
-  }
-
+  // ---------- INTERFACE ----------
   return (
     <ProtectedRoute>
-      <div className="container mx-auto px-4 py-6 md:py-8">
-        {/* Cabeçalho */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-gray-100 rounded-full hidden sm:flex">
-              <Users className="w-5 h-5 text-gray-600" />
-            </div>
+      <main className="min-h-screen bg-slate-50/80 px-4 py-6 md:px-7 md:py-8">
+        <div className="mx-auto max-w-7xl">
+
+          {/* CABEÇALHO */}
+          <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-xl md:text-2xl font-bold text-gray-800">Clientes</h1>
-              <p className="text-sm text-gray-500 hidden sm:block">
-                Gerencie todos os clientes do sistema
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">
+                <span className="h-2 w-2 rounded-full bg-blue-600" />
+                Gestão de utilizadores
+              </div>
+
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+                Clientes
+              </h1>
+
+              <p className="mt-1.5 text-sm text-slate-500">
+                Consulte, acompanhe e actualize os dados dos clientes registados.
               </p>
             </div>
-          </div>
-          
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-full text-xs text-gray-500 hidden sm:flex items-center gap-1">
-              <Users className="w-3.5 h-3.5 text-gray-400" />
-              <span>{total} clientes</span>
-            </div>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              leftIcon={<SlidersHorizontal className="w-4 h-4" />}
-              className="border-gray-200 text-gray-600 hover:bg-gray-50"
-            >
-              Filtros
-              {(statusFilter || provinciaFilter) && (
-                <span className="ml-1 px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">
-                  {(statusFilter ? 1 : 0) + (provinciaFilter ? 1 : 0)}
-                </span>
-              )}
-            </Button>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              leftIcon={<RefreshCw className="w-4 h-4" />}
-              className="border-gray-200 text-gray-600 hover:bg-gray-50"
-            />
-            
-            <Link href="/register?perfil=cliente&from=clientes">
-              <Button
-                variant="primary"
-                size="sm"
-                leftIcon={<Plus className="w-4 h-4" />}
-                className="bg-gray-800 hover:bg-gray-900 text-white"
+
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/register?perfil=cliente&from=clientes"
+                className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
               >
-                Novo Cliente
-              </Button>
-            </Link>
+                + Novo cliente
+              </Link>
+
+              <button
+                onClick={() => void load()}
+                disabled={loading}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <span className={loading ? "animate-spin" : ""}>
+                  ↻
+                </span>
+                Actualizar lista
+              </button>
+            </div>
           </div>
+
+          {/* MENSAGENS */}
+          {notice && (
+            <div
+              role="status"
+              className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
+            >
+              ✓ {notice}
+            </div>
+          )}
+
+          {error && (
+            <div
+              role="alert"
+              className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            >
+              ! {error}
+            </div>
+          )}
+
+          {/* ESTATÍSTICAS */}
+          <section className="mb-5 grid gap-3 sm:grid-cols-3">
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <span className="text-sm font-medium text-slate-500">
+                Total de clientes
+              </span>
+
+              <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+                {total}
+              </div>
+
+              <p className="mt-1 text-xs text-slate-400">
+                Registos encontrados
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <span className="text-sm font-medium text-slate-500">
+                Activos nesta página
+              </span>
+
+              <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+                {activeCount}
+              </div>
+
+              <p className="mt-1 text-xs text-slate-400">
+                Com conta activa
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <span className="text-sm font-medium text-slate-500">
+                Inactivos nesta página
+              </span>
+
+              <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+                {inactiveCount}
+              </div>
+
+              <p className="mt-1 text-xs text-slate-400">
+                Sem actividade actual
+              </p>
+            </div>
+
+          </section>
+
+          {/* LISTA DE CLIENTES */}
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+            {/* PESQUISA E FILTROS */}
+            <div className="border-b border-slate-100 p-4 md:p-5">
+
+              <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="font-semibold text-slate-900">
+                    Lista de clientes
+                  </h2>
+
+                  <p className="mt-1 text-xs text-slate-500">
+                    Pesquise e filtre os registos para encontrar rapidamente um cliente.
+                  </p>
+                </div>
+
+                <span className="text-xs text-slate-400">
+                  {total} resultado(s)
+                </span>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_210px]">
+
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                    ⌕
+                  </span>
+
+                  <input
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setPage(1);
+                    }}
+                    placeholder="Pesquisar por nome, e-mail, telefone, NIF ou código..."
+                    className={`${inputClass} pl-10`}
+                  />
+                </div>
+
+                <select
+                  value={status}
+                  onChange={(e) => {
+                    setStatus(e.target.value);
+                    setPage(1);
+                  }}
+                  className={inputClass}
+                >
+                  <option value="">Todos os estados</option>
+                  <option value="ativo">Activos</option>
+                  <option value="inativo">Inactivos</option>
+                </select>
+
+              </div>
+            </div>
+
+            {/* ESTADO DE CARREGAMENTO */}
+            {loading ? (
+              <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-sm text-slate-500">
+                <span className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600" />
+                A carregar clientes...
+              </div>
+            ) : items.length === 0 ? (
+
+              /* LISTA VAZIA */
+              <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-xl text-slate-500">
+                  ⌕
+                </div>
+
+                <p className="font-semibold text-slate-800">
+                  Nenhum cliente encontrado
+                </p>
+
+                <p className="mt-1 max-w-sm text-sm text-slate-500">
+                  Experimente alterar os termos de pesquisa ou o filtro de estado.
+                </p>
+              </div>
+
+            ) : (
+
+              <>
+                {/* TABELA DESKTOP */}
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full text-left text-sm">
+
+                    <thead className="bg-slate-50/80 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                      <tr>
+                        <th className="px-5 py-3.5">Cliente</th>
+                        <th className="px-5 py-3.5">Contacto</th>
+                        <th className="px-5 py-3.5">Identificador</th>
+                        <th className="px-5 py-3.5">Estado</th>
+                        <th className="px-5 py-3.5 text-right">Acção</th>
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-slate-100">
+                      {items.map((c) => (
+                        <tr
+                          key={c.utilizadorId}
+                          className="transition hover:bg-slate-50/70"
+                        >
+
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-3">
+
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">
+                                {initials(c.nome)}
+                              </div>
+
+                              <div className="min-w-0">
+                                <div className="truncate font-semibold text-slate-800">
+                                  {c.nome || "Nome não indicado"}
+                                </div>
+
+                                <div className="mt-0.5 truncate text-xs text-slate-500">
+                                  {c.email || "Sem e-mail"}
+                                </div>
+                              </div>
+
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-4 text-slate-600">
+                            {c.telefone || "—"}
+                          </td>
+
+                          <td className="px-5 py-4 font-mono text-xs text-slate-500">
+                            {c.clienteId || c.utilizadorId}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                isActive(c)
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : "bg-slate-100 text-slate-600"
+                              }`}
+                            >
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${
+                                  isActive(c)
+                                    ? "bg-emerald-500"
+                                    : "bg-slate-400"
+                                }`}
+                              />
+
+                              {isActive(c) ? "Activo" : "Inactivo"}
+                            </span>
+                          </td>
+
+                          <td className="px-5 py-4 text-right">
+                            <button
+                              onClick={() => void openDetail(c)}
+                              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                            >
+                              Ver detalhes&nbsp; →
+                            </button>
+                          </td>
+
+                        </tr>
+                      ))}
+                    </tbody>
+
+                  </table>
+                </div>
+
+                {/* CARTÕES MOBILE */}
+                <div className="divide-y divide-slate-100 md:hidden">
+                  {items.map((c) => (
+                    <article
+                      key={c.utilizadorId}
+                      className="flex items-start gap-3 p-4"
+                    >
+
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">
+                        {initials(c.nome)}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="truncate text-sm font-semibold text-slate-900">
+                            {c.nome || "Nome não indicado"}
+                          </h3>
+
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                              isActive(c)
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {isActive(c) ? "Activo" : "Inactivo"}
+                          </span>
+                        </div>
+
+                        <p className="mt-1 truncate text-xs text-slate-500">
+                          {c.email || "Sem e-mail"}
+                        </p>
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          {c.telefone || "Sem telefone"}
+                        </p>
+
+                        <button
+                          onClick={() => void openDetail(c)}
+                          className="mt-3 text-xs font-semibold text-blue-700"
+                        >
+                          Ver detalhes →
+                        </button>
+
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* PAGINAÇÃO */}
+            <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+
+              <span className="text-xs text-slate-500">
+                A mostrar{" "}
+                {items.length ? (page - 1) * 10 + 1 : 0}
+                –
+                {(page - 1) * 10 + items.length}
+                {" "}de {total} registo(s)
+              </span>
+
+              <div className="flex items-center gap-2">
+
+                <button
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ← Anterior
+                </button>
+
+                <span className="min-w-20 text-center text-xs font-medium text-slate-600">
+                  Página {page} / {Math.max(totalPages, 1)}
+                </span>
+
+                <button
+                  disabled={
+                    page >= totalPages ||
+                    loading ||
+                    totalPages === 0
+                  }
+                  onClick={() => setPage((p) => p + 1)}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Seguinte →
+                </button>
+
+              </div>
+            </div>
+
+          </section>
         </div>
 
-        <p className="text-sm text-gray-500 mb-4 sm:hidden">
-          Gerencie todos os clientes do sistema
-        </p>
+        {/* MODAL DE DETALHES E EDIÇÃO */}
+        {selected && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-3 backdrop-blur-[2px] sm:p-6"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) {
+                setSelected(null);
+              }
+            }}
+          >
 
-        {/* Painel de Filtros */}
-        {(showFilters || statusFilter || provinciaFilter) && (
-          <Card className="mb-6 border border-gray-100 shadow-sm">
-            <CardBody className="p-4">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1">
-                  <form onSubmit={handleSearch} className="relative">
-                    <Input
-                      placeholder="Pesquisar clientes..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="bg-gray-50 border-gray-200 focus:bg-white text-gray-700 placeholder:text-gray-400 pr-10"
-                      leftIcon={<Search className="w-4 h-4 text-gray-400" />}
-                    />
-                    {searchTerm && (
-                      <button
-                        type="button"
-                        onClick={() => setSearchTerm('')}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            <form
+              onSubmit={save}
+              className="my-auto w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+            >
+
+              {/* CABEÇALHO DO MODAL */}
+              <div className="flex items-start justify-between border-b border-slate-100 bg-slate-50/80 px-5 py-4 sm:px-7">
+
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">
+                    Perfil do cliente
+                  </p>
+
+                  <h2 className="mt-1 text-xl font-bold text-slate-900">
+                    Dados do cliente
+                  </h2>
+
+                  <p className="mt-1 font-mono text-[11px] text-slate-400">
+                    {selected.utilizadorId}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  aria-label="Fechar"
+                  className="rounded-lg p-2 text-xl leading-none text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                >
+                  ×
+                </button>
+
+              </div>
+
+              {/* CONTEÚDO DO MODAL */}
+              <div className="max-h-[calc(100vh-190px)] space-y-6 overflow-y-auto px-5 py-5 sm:px-7">
+
+                {/* INFORMAÇÕES PESSOAIS */}
+                <section>
+                  <h3 className="mb-3 text-sm font-semibold text-slate-800">
+                    Informações pessoais e contacto
+                  </h3>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+
+                    {(
+                      [
+                        ["nome", "Nome completo", "text"],
+                        ["email", "E-mail", "email"],
+                        ["telefone", "Telefone principal", "tel"],
+                        ["telefoneAlternativo", "Telefone alternativo", "tel"],
+                        ["nif", "NUIT", "text"],
+                      ] as const
+                    ).map(([key, label, type]) => (
+                      <label
+                        key={key}
+                        className="grid gap-1.5 text-xs font-medium text-slate-600"
                       >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
-                  </form>
-                </div>
+                        {label}
 
-                <div className="flex flex-wrap gap-3">
-                  <Select
-                    label="Status"
-                    options={statusOptions}
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="bg-gray-50 border-gray-200 focus:bg-white text-gray-700 min-w-[140px]"
-                    containerClassName="flex-1 md:flex-none"
-                  />
-                  
-                  <Select
-                    label="Província"
-                    options={provinciaOptions}
-                    value={provinciaFilter}
-                    onChange={(e) => setProvinciaFilter(e.target.value)}
-                    className="bg-gray-50 border-gray-200 focus:bg-white text-gray-700 min-w-[140px]"
-                    containerClassName="flex-1 md:flex-none"
-                  />
-                </div>
-
-                <div className="flex items-end gap-2">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={aplicarFiltros}
-                    className="bg-gray-800 hover:bg-gray-900 text-white"
-                  >
-                    Aplicar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleClearFilters}
-                    className="border-gray-200 text-gray-600 hover:bg-gray-50"
-                  >
-                    Limpar
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowFilters(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardBody>
-          </Card>
-        )}
-
-        {/* Erro */}
-        {error && (
-          <Alert variant="danger" className="mb-4" dismissible onDismiss={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
-
-        {/* VERIFICAR SE NÃO HÁ CLIENTES */}
-        {clientes.length === 0 ? (
-          <Card className="border border-gray-100 shadow-sm">
-            <CardBody className="py-16 px-4 text-center">
-              <div className="flex flex-col items-center max-w-md mx-auto">
-                <div className="p-4 bg-gray-100 rounded-full mb-4">
-                  <Users className="w-16 h-16 text-gray-400" />
-                </div>
-                
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">
-                  Nenhum cliente encontrado
-                </h3>
-                
-                <p className="text-sm text-gray-500 mb-6">
-                  {searchTerm || statusFilter || provinciaFilter 
-                    ? 'Não há clientes que correspondam aos filtros aplicados. Tente ajustar os filtros ou limpar a pesquisa.'
-                    : 'Não há clientes registrados no sistema. Clique no botão abaixo para adicionar o primeiro cliente.'
-                  }
-                </p>
-                
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  {(searchTerm || statusFilter || provinciaFilter) && (
-                    <Button
-                      variant="outline"
-                      size="md"
-                      onClick={handleClearFilters}
-                      className="border-gray-200 text-gray-600 hover:bg-gray-50"
-                    >
-                      Limpar filtros
-                    </Button>
-                  )}
-                  
-                  <Link href="/register?perfil=cliente&from=clientes">
-                    <Button
-                      variant="primary"
-                      size="md"
-                      leftIcon={<UserPlus className="w-4 h-4" />}
-                      className="bg-gray-800 hover:bg-gray-900 text-white"
-                    >
-                      Novo Cliente
-                    </Button>
-                  </Link>
-                  
-                  <Button
-                    variant="ghost"
-                    size="md"
-                    onClick={handleRefresh}
-                    leftIcon={<RefreshCw className="w-4 h-4" />}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    Atualizar
-                  </Button>
-                </div>
-              </div>
-            </CardBody>
-          </Card>
-        ) : (
-          <>
-            {/* Cards Mobile */}
-            <div className="grid grid-cols-1 gap-3 md:hidden">
-              {clientes.map((cliente) => (
-                <ClienteCardMobile key={cliente.clienteId} cliente={cliente} />
-              ))}
-            </div>
-
-            {/* Tabela Desktop */}
-            <div className="hidden md:block overflow-x-auto rounded-lg border border-gray-100 shadow-sm">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Telefone</th>
-                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Cidade</th>
-                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {clientes.map((cliente) => (
-                    <ClienteRow key={cliente.clienteId} cliente={cliente} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Paginação */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-4 border-t border-gray-100 mt-4">
-              <div className="text-sm text-gray-500">
-                Mostrando <span className="font-medium text-gray-700">{clientes.length}</span> de{' '}
-                <span className="font-medium text-gray-700">{total}</span> clientes
-              </div>
-              
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">Por página:</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => changePageSize(Number(e.target.value))}
-                    className="px-2 py-1 text-sm border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400"
-                  >
-                    {[5, 10, 25, 50].map((size) => (
-                      <option key={size} value={size}>
-                        {size}
-                      </option>
+                        <input
+                          type={type}
+                          required={["nome", "email", "telefone"].includes(key)}
+                          value={form[key]}
+                          onChange={(e) =>
+                            setField(key, e.target.value)
+                          }
+                          className={inputClass}
+                        />
+                      </label>
                     ))}
-                  </select>
-                </div>
-                
-                {totalPages > 1 && (
-                  <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={goToPage}
-                    size="sm"
-                    showFirstLast={true}
-                    className="flex-wrap"
-                  />
-                )}
+
+                  </div>
+                </section>
+
+                {/* ENDEREÇO */}
+                <section>
+                  <h3 className="mb-3 text-sm font-semibold text-slate-800">
+                    Endereço
+                  </h3>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+
+                    {(
+                      [
+                        ["endereco", "Rua / Endereço"],
+                        ["cidade", "Cidade"],
+                        ["provincia", "Província"],
+                        ["pais", "País"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <label
+                        key={key}
+                        className="grid gap-1.5 text-xs font-medium text-slate-600"
+                      >
+                        {label}
+
+                        <input
+                          value={form[key]}
+                          onChange={(e) =>
+                            setField(key, e.target.value)
+                          }
+                          className={inputClass}
+                        />
+                      </label>
+                    ))}
+
+                  </div>
+                </section>
+
+                {/* ESTADO E OBSERVAÇÕES */}
+                <section>
+                  <h3 className="mb-3 text-sm font-semibold text-slate-800">
+                    Estado e observações
+                  </h3>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+
+                    <label className="grid gap-1.5 text-xs font-medium text-slate-600">
+                      Estado da conta
+
+                      <select
+                        value={form.estadoConta}
+                        onChange={(e) =>
+                          setField("estadoConta", e.target.value)
+                        }
+                        className={inputClass}
+                      >
+                        <option value="ativo">Activo</option>
+                        <option value="inativo">Inactivo</option>
+                        <option value="bloqueado">Bloqueado</option>
+                        <option value="suspenso">Suspenso</option>
+                        <option value="pendente_ativacao">
+                          Pendente de activação
+                        </option>
+                      </select>
+                    </label>
+
+                    <label className="flex items-center gap-3 rounded-xl border border-slate-200 px-3.5 py-3 text-sm text-slate-700">
+
+                      <input
+                        type="checkbox"
+                        checked={form.ativo}
+                        onChange={(e) =>
+                          setField("ativo", e.target.checked)
+                        }
+                        className="h-4 w-4 rounded border-slate-300 accent-blue-600"
+                      />
+
+                      <span>
+                        <span className="block font-semibold">
+                          Registo activo
+                        </span>
+
+                        <span className="text-xs text-slate-500">
+                          Permitir que a conta permaneça activa
+                        </span>
+                      </span>
+
+                    </label>
+
+                    <label className="grid gap-1.5 text-xs font-medium text-slate-600 sm:col-span-2">
+                      Observações
+
+                      <textarea
+                        rows={3}
+                        value={form.observacoes}
+                        onChange={(e) =>
+                          setField("observacoes", e.target.value)
+                        }
+                        className={`${inputClass} resize-y`}
+                        placeholder="Notas adicionais sobre o cliente..."
+                      />
+                    </label>
+
+                  </div>
+                </section>
+
               </div>
-            </div>
-          </>
+
+              {/* BOTÕES DO MODAL */}
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-white px-5 py-4 sm:flex-row sm:justify-end sm:px-7">
+
+                <button
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  disabled={saving}
+                  className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {saving ? "A guardar..." : "Guardar alterações"}
+                </button>
+
+              </div>
+
+            </form>
+          </div>
         )}
-      </div>
+
+      </main>
     </ProtectedRoute>
   );
 }
-
-// ================================================================
-// COMPONENTES
-// ================================================================
-
-const ClienteRow: React.FC<{ cliente: Cliente }> = ({ cliente }) => {
-  return (
-    <tr className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-      <td className="py-3 px-4">
-        <span className="font-mono text-sm text-gray-600">{cliente.clienteId}</span>
-      </td>
-      <td className="py-3 px-4">
-        <span className="text-sm font-medium text-gray-800">{cliente.nome}</span>
-      </td>
-      <td className="py-3 px-4">
-        <span className="text-sm text-gray-600">{cliente.email}</span>
-      </td>
-      <td className="py-3 px-4">
-        <span className="text-sm text-gray-600">{cliente.telefone}</span>
-      </td>
-      <td className="py-3 px-4">
-        <span className="text-sm text-gray-600">{cliente.cidade || '-'}</span>
-      </td>
-      <td className="py-3 px-4">
-        <span className={cn(
-          'inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-medium rounded-full',
-          cliente.ativo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-        )}>
-          {cliente.ativo ? (
-            <><CheckCircle className="w-3 h-3" /> Ativo</>
-          ) : (
-            <><XCircle className="w-3 h-3" /> Inativo</>
-          )}
-        </span>
-      </td>
-      <td className="py-3 px-4">
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1.5">
-            <Eye className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="sm" className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1.5">
-            <Edit className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="sm" className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1.5">
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
-      </td>
-    </tr>
-  );
-};
-
-const ClienteCardMobile: React.FC<{ cliente: Cliente }> = ({ cliente }) => {
-  return (
-    <Card className="border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-      <CardBody className="p-4">
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <UserCircle className="w-8 h-8 text-gray-400" />
-            <div>
-              <h3 className="text-sm font-medium text-gray-800">{cliente.nome}</h3>
-              <p className="text-xs text-gray-500">{cliente.clienteId}</p>
-            </div>
-          </div>
-          <span className={cn(
-            'inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full',
-            cliente.ativo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-          )}>
-            {cliente.ativo ? 'Ativo' : 'Inativo'}
-          </span>
-        </div>
-        
-        <div className="space-y-1 text-xs text-gray-500">
-          <div className="flex items-center gap-1">
-            <Mail className="w-3 h-3" />
-            <span>{cliente.email}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Phone className="w-3 h-3" />
-            <span>{cliente.telefone}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Building className="w-3 h-3" />
-            <span>NIF: {cliente.nif}</span>
-          </div>
-          {cliente.cidade && (
-            <div className="flex items-center gap-1">
-              <MapPin className="w-3 h-3" />
-              <span>{cliente.cidade}, {cliente.provincia || ''}</span>
-            </div>
-          )}
-        </div>
-        
-        <div className="flex items-center justify-end mt-3 pt-3 border-t border-gray-100 gap-1">
-          <Button variant="ghost" size="sm" className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1.5">
-            <Eye className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="sm" className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1.5">
-            <Edit className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="sm" className="text-gray-400 hover:text-red-600 hover:bg-red-50 p-1.5">
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
-      </CardBody>
-    </Card>
-  );
-};
